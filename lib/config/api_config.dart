@@ -1,7 +1,8 @@
 class ApiConfig {
   // Change this to your actual API URL
-  static const String baseUrl = 'http://10.0.2.2:8000/api'; // Android emulator
-  // static const String baseUrl = 'http://localhost:8000/api'; // iOS simulator
+  // API is served through nginx on port 80 (port 8000 is no longer exposed)
+  static const String baseUrl = 'http://10.0.2.2/api'; // Android emulator
+  // static const String baseUrl = 'http://localhost/api'; // iOS simulator
   
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
