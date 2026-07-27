@@ -7,6 +7,7 @@ class UserModel {
   final String? profilePicture;
   final String? token;
   final List<String>? permissions;
+  final BuyerMini? buyer;
 
   UserModel({
     required this.id,
@@ -17,6 +18,7 @@ class UserModel {
     this.profilePicture,
     this.token,
     this.permissions,
+    this.buyer,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +33,17 @@ class UserModel {
       permissions: json['permissions'] != null
           ? List<String>.from(json['permissions'])
           : null,
+      buyer: json['buyer'] != null ? BuyerMini.fromJson(json['buyer']) : null,
     );
+  }
+}
+
+class BuyerMini {
+  final String id;
+
+  BuyerMini({required this.id});
+
+  factory BuyerMini.fromJson(Map<String, dynamic> json) {
+    return BuyerMini(id: json['id'].toString());
   }
 }

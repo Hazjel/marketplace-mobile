@@ -1,93 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/home/data/product_repository.dart';
-import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
+import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class ProductDetailScreen extends StatefulWidget {
+class ProductDetailScreen extends StatelessWidget {
   final String slug;
 
   const ProductDetailScreen({super.key, required this.slug});
 
   @override
-  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<ProductDetailViewModel>(
+      create: (ctx) {
+        final apiClient = ctx.read<ApiClient>();
+        return ProductDetailViewModel(
+          ProductRepository(apiClient),
+          CartRepository(apiClient),
+        )..loadProduct(slug);
+      },
+      child: _ProductDetailView(slug: slug),
+    );
+  }
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  final _productRepository = ProductRepository(ApiClient());
-  final _cartRepository = CartRepository(ApiClient());
-  ProductModel? _product;
-  bool _isLoading = true;
-  bool _addingToCart = false;
-  String? _error;
+class _ProductDetailView extends StatelessWidget {
+  final String slug;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProduct();
-  }
-
-  Future<void> _loadProduct() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final product = await _productRepository.getProductBySlug(widget.slug);
-      setState(() {
-        _product = product;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _addToCart() async {
-    if (_product == null) return;
-
-    setState(() => _addingToCart = true);
-    try {
-      await _cartRepository.addToCart(productId: _product!.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Produk ditambahkan ke keranjang'),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _addingToCart = false);
-    }
-  }
+  const _ProductDetailView({required this.slug});
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final viewModel = context.watch<ProductDetailViewModel>();
+
+    if (viewModel.isLoading) {
       return Scaffold(
         appBar: AppBar(),
         body: const LoadingWidget(),
       );
     }
 
-    if (_error != null || _product == null) {
+    if (viewModel.error != null || viewModel.product == null) {
       return Scaffold(
         appBar: AppBar(),
         body: Center(
@@ -96,16 +53,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
               const SizedBox(height: 16),
-              Text(_error ?? 'Produk tidak ditemukan'),
+              Text(viewModel.error ?? 'Produk tidak ditemukan'),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _loadProduct, child: const Text('Coba Lagi')),
+              ElevatedButton(
+                onPressed: () => viewModel.loadProduct(slug),
+                child: const Text('Coba Lagi'),
+              ),
             ],
           ),
         ),
       );
     }
 
-    final product = _product!;
+    final product = viewModel.product!;
 
     return Scaffold(
       appBar: AppBar(
@@ -261,8 +221,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: SizedBox(
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: _addingToCart ? null : _addToCart,
-                  icon: _addingToCart
+                  onPressed: viewModel.addingToCart
+                      ? null
+                      : () async {
+                          final error = await viewModel.addToCart();
+                          if (!context.mounted) return;
+                          if (error == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Produk ditambahkan ke keranjang'),
+                                backgroundColor: Color(0xFF10B981),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(error),
+                                backgroundColor: const Color(0xFFEF4444),
+                              ),
+                            );
+                          }
+                        },
+                  icon: viewModel.addingToCart
                       ? const SizedBox(
                           width: 18,
                           height: 18,

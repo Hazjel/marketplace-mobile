@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/responsive.dart';
-import 'package:blukios_marketplace/features/home/data/product_repository.dart';
-import 'package:blukios_marketplace/features/home/models/product_model.dart';
-import 'package:blukios_marketplace/features/home/models/category_model.dart';
-import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
-import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
-import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
+import 'package:blukios_marketplace/features/home/viewmodels/home_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
@@ -18,45 +15,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _productRepository = ProductRepository(ApiClient());
-  List<ProductModel> _products = [];
-  List<CategoryModel> _categories = [];
-  bool _isLoading = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomeViewModel>().loadData();
     });
-
-    try {
-      final results = await Future.wait([
-        _productRepository.getProducts(),
-        _productRepository.getCategories(),
-      ]);
-
-      setState(() {
-        _products = results[0] as List<ProductModel>;
-        _categories = results[1] as List<CategoryModel>;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<HomeViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Row(
@@ -72,26 +42,20 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            ),
+            onPressed: () => context.push(AppRoutes.cart),
           ),
           IconButton(
             icon: const Icon(Icons.receipt_long_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TransactionListScreen()),
-            ),
+            onPressed: () => context.push(AppRoutes.transactions),
           ),
         ],
       ),
-      body: _isLoading
+      body: viewModel.isLoading
           ? const LoadingWidget()
-          : _error != null
-              ? _buildError()
+          : viewModel.error != null
+              ? _buildError(viewModel)
               : RefreshIndicator(
-                  onRefresh: _loadData,
+                  onRefresh: viewModel.loadData,
                   child: CustomScrollView(
                     slivers: [
                       // Search Bar
@@ -107,15 +71,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderSide: BorderSide.none,
                               ),
                             ),
-                            onSubmitted: (query) {
-                              // TODO: Implement search
-                            },
+                            onSubmitted: (query) => viewModel.search(query.trim()),
                           ),
                         ),
                       ),
 
                       // Categories
-                      if (_categories.isNotEmpty) ...[
+                      if (viewModel.categories.isNotEmpty) ...[
                         const SliverToBoxAdapter(
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -131,9 +93,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListView.builder(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                               scrollDirection: Axis.horizontal,
-                              itemCount: _categories.length,
+                              itemCount: viewModel.categories.length,
                               itemBuilder: (context, index) {
-                                final cat = _categories[index];
+                                final cat = viewModel.categories[index];
                                 return Container(
                                   width: 80,
                                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -194,18 +156,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                              final product = _products[index];
+                              final product = viewModel.products[index];
                               return ProductCard(
                                 product: product,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductDetailScreen(slug: product.slug),
-                                  ),
-                                ),
+                                onTap: () => context.push(AppRoutes.productDetailPath(product.slug)),
                               );
                             },
-                            childCount: _products.length,
+                            childCount: viewModel.products.length,
                           ),
                         ),
                       ),
@@ -218,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildError() {
+  Widget _buildError(HomeViewModel viewModel) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -228,13 +185,13 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
             const SizedBox(height: 16),
             Text(
-              _error ?? 'Terjadi kesalahan',
+              viewModel.error ?? 'Terjadi kesalahan',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadData,
+              onPressed: viewModel.loadData,
               child: const Text('Coba Lagi'),
             ),
           ],

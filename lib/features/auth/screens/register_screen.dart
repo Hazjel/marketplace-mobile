@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
-import 'package:blukios_marketplace/core/network/api_exceptions.dart';
-import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
-import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -18,12 +16,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _errorMessage;
   String _selectedRole = 'buyer';
-
-  final _authRepository = AuthRepository(ApiClient());
 
   @override
   void dispose() {
@@ -38,44 +32,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await _authRepository.register(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        phoneNumber: _phoneController.text.trim(),
-        role: _selectedRole,
-      );
-
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
+    await context.read<AuthViewModel>().register(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          phoneNumber: _phoneController.text.trim(),
+          role: _selectedRole,
         );
-      }
-    } on ApiException catch (e) {
-      String errorMsg = e.message;
-      if (e.errors is Map) {
-        final fieldErrors = (e.errors as Map).values
-            .expand((v) => v is List ? v : [v])
-            .join('\n');
-        if (fieldErrors.isNotEmpty) errorMsg = fieldErrors;
-      }
-      setState(() => _errorMessage = errorMsg);
-    } catch (e) {
-      setState(() => _errorMessage = 'Terjadi kesalahan, coba lagi');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authViewModel = context.watch<AuthViewModel>();
+    final errorMessage = authViewModel.errorMessage;
+    final isLoading = authViewModel.isLoading;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daftar Akun'),
@@ -104,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 24),
 
                 // Error
-                if (_errorMessage != null) ...[
+                if (errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -112,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _errorMessage!,
+                      errorMessage,
                       style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
                     ),
                   ),
@@ -236,8 +207,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleRegister,
-                    child: _isLoading
+                    onPressed: isLoading ? null : _handleRegister,
+                    child: isLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,

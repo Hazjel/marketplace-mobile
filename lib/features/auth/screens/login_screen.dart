@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
-import 'package:blukios_marketplace/core/network/api_exceptions.dart';
+import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/storage/secure_storage.dart';
-import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
-import 'package:blukios_marketplace/features/auth/screens/register_screen.dart';
-import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,12 +21,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _isGoogleLoading = false;
   bool _obscurePassword = true;
-  String? _errorMessage;
+  bool _isGoogleLoading = false;
+  String? _googleErrorMessage;
 
-  final _authRepository = AuthRepository(ApiClient());
   late final AppLinks _appLinks;
   StreamSubscription? _linkSub;
 
@@ -49,26 +46,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleOAuthCallback(Uri uri) async {
     final token = uri.queryParameters['token'];
     if (token == null || token.isEmpty) {
-      setState(() => _errorMessage = 'Login Google gagal: token tidak ditemukan');
-      setState(() => _isGoogleLoading = false);
+      setState(() {
+        _googleErrorMessage = 'Login Google gagal: token tidak ditemukan';
+        _isGoogleLoading = false;
+      });
       return;
     }
 
     setState(() {
       _isGoogleLoading = true;
-      _errorMessage = null;
+      _googleErrorMessage = null;
     });
 
     try {
       await SecureStorage.saveToken(token);
-
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        await context.read<AuthViewModel>().refreshAfterExternalLogin();
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Gagal menyimpan sesi login');
+      setState(() => _googleErrorMessage = 'Gagal menyimpan sesi login');
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -84,36 +80,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await _authRepository.login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+    await context.read<AuthViewModel>().login(
+          _emailController.text.trim(),
+          _passwordController.text,
         );
-      }
-    } on ApiException catch (e) {
-      setState(() => _errorMessage = e.message);
-    } catch (e) {
-      setState(() => _errorMessage = 'Terjadi kesalahan, coba lagi');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _handleGoogleLogin() async {
     setState(() {
       _isGoogleLoading = true;
-      _errorMessage = null;
+      _googleErrorMessage = null;
     });
 
     try {
@@ -125,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
     } catch (e) {
       setState(() {
-        _errorMessage = 'Gagal membuka Google Login';
+        _googleErrorMessage = 'Gagal membuka Google Login';
         _isGoogleLoading = false;
       });
     }
@@ -134,6 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authViewModel = context.watch<AuthViewModel>();
+    final errorMessage = _googleErrorMessage ?? authViewModel.errorMessage;
+    final isLoading = authViewModel.isLoading;
 
     return Scaffold(
       body: SafeArea(
@@ -174,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 40),
 
                   // Error message
-                  if (_errorMessage != null) ...[
+                  if (errorMessage != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -187,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _errorMessage!,
+                              errorMessage,
                               style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
                             ),
                           ),
@@ -201,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(
                     height: 50,
                     child: OutlinedButton.icon(
-                      onPressed: (_isGoogleLoading || _isLoading) ? null : _handleGoogleLogin,
+                      onPressed: (_isGoogleLoading || isLoading) ? null : _handleGoogleLogin,
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: theme.dividerColor),
                         shape: RoundedRectangleBorder(
@@ -297,8 +276,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: (_isLoading || _isGoogleLoading) ? null : _handleLogin,
-                      child: _isLoading
+                      onPressed: (isLoading || _isGoogleLoading) ? null : _handleLogin,
+                      child: isLoading
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -323,11 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                          );
-                        },
+                        onTap: () => context.push(AppRoutes.register),
                         child: const Text(
                           'Daftar',
                           style: TextStyle(

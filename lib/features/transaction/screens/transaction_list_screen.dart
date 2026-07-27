@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
+import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
-import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
+import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
 class TransactionListScreen extends StatefulWidget {
@@ -14,59 +14,41 @@ class TransactionListScreen extends StatefulWidget {
 }
 
 class _TransactionListScreenState extends State<TransactionListScreen> {
-  final _transactionRepository = TransactionRepository(ApiClient());
-  List<TransactionModel> _transactions = [];
-  bool _isLoading = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
-  }
-
-  Future<void> _loadTransactions() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TransactionViewModel>().loadTransactions();
     });
-
-    try {
-      final transactions = await _transactionRepository.getTransactions();
-      setState(() {
-        _transactions = transactions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = context.watch<TransactionViewModel>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Transaksi'),
       ),
-      body: _isLoading
+      body: viewModel.isLoading
           ? const LoadingWidget()
-          : _error != null
+          : viewModel.error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
                       const SizedBox(height: 16),
-                      Text(_error!),
+                      Text(viewModel.error!),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadTransactions, child: const Text('Coba Lagi')),
+                      ElevatedButton(
+                        onPressed: viewModel.loadTransactions,
+                        child: const Text('Coba Lagi'),
+                      ),
                     ],
                   ),
                 )
-              : _transactions.isEmpty
+              : viewModel.transactions.isEmpty
                   ? const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -86,21 +68,31 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _loadTransactions,
+                      onRefresh: viewModel.loadTransactions,
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _transactions.length,
+                        itemCount: viewModel.transactions.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final trx = _transactions[index];
-                          return _buildTransactionCard(trx);
+                          final trx = viewModel.transactions[index];
+                          return _buildTransactionCard(viewModel, trx);
                         },
                       ),
                     ),
     );
   }
 
-  Widget _buildTransactionCard(TransactionModel trx) {
+  Future<void> _refreshStatus(TransactionViewModel viewModel, TransactionModel trx) async {
+    final error = await viewModel.refreshStatus(trx.id);
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: const Color(0xFFEF4444)),
+      );
+    }
+  }
+
+  Widget _buildTransactionCard(TransactionViewModel viewModel, TransactionModel trx) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -115,10 +107,16 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                   trx.code,
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
-                _buildStatusBadge(trx.status, trx.statusLabel),
+                _buildStatusBadge(trx.paymentStatus, trx.paymentStatusLabel),
               ],
             ),
             const SizedBox(height: 4),
+            if (trx.storeName != null)
+              Text(
+                trx.storeName!,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+            const SizedBox(height: 2),
             Text(
               DateFormatter.format(trx.createdAt),
               style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
@@ -145,6 +143,16 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 ),
               ],
             ),
+            if (trx.paymentStatus == 'pending') ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => _refreshStatus(viewModel, trx),
+                  child: const Text('Cek Status Pembayaran'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -156,16 +164,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     Color textColor;
 
     switch (status) {
-      case 'completed':
+      case 'paid':
         bgColor = const Color(0xFFDCFCE7);
         textColor = const Color(0xFF16A34A);
         break;
-      case 'paid':
-      case 'processing':
-      case 'shipped':
-        bgColor = const Color(0xFFEFF6FF);
-        textColor = const Color(0xFF2563EB);
-        break;
+      case 'failed':
       case 'cancelled':
       case 'expired':
         bgColor = const Color(0xFFFEE2E2);

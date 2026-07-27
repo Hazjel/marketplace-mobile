@@ -27,9 +27,19 @@ class ApiClient {
     }
   }
 
-  Future<Response> post(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  Future<Response> post(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? headers,
+  }) async {
     try {
-      return await _dio.post(path, data: data, queryParameters: queryParameters);
+      return await _dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: headers != null ? Options(headers: headers) : null,
+      );
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
     }
@@ -43,9 +53,9 @@ class ApiClient {
     }
   }
 
-  Future<Response> delete(String path) async {
+  Future<Response> delete(String path, {Map<String, dynamic>? queryParameters}) async {
     try {
-      return await _dio.delete(path);
+      return await _dio.delete(path, queryParameters: queryParameters);
     } on DioException catch (e) {
       throw ApiException.fromDioError(e);
     }

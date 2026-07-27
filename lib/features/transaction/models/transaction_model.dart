@@ -1,69 +1,113 @@
 class TransactionModel {
   final String id;
   final String code;
-  final String status;
-  final int totalPrice;
-  final int shippingCost;
-  final String? paymentUrl;
-  final String? shippingMethod;
+  final String? storeId;
+  final String? storeName;
+  final String? addressId;
+  final String? address;
+  final String? city;
+  final String? postalCode;
+  final double? destLatitude;
+  final double? destLongitude;
+  final String? shipping;
+  final String? shippingType;
+  final double shippingCost;
   final String? trackingNumber;
+  final String? deliveryProof;
+  final String deliveryStatus;
+  final double tax;
+  final double grandTotal;
+  final String paymentStatus;
+  final String? snapToken;
   final String? createdAt;
-  final List<TransactionDetailModel>? details;
+  final List<TransactionDetailModel> transactionDetails;
 
   TransactionModel({
     required this.id,
     required this.code,
-    required this.status,
-    required this.totalPrice,
+    this.storeId,
+    this.storeName,
+    this.addressId,
+    this.address,
+    this.city,
+    this.postalCode,
+    this.destLatitude,
+    this.destLongitude,
+    this.shipping,
+    this.shippingType,
     required this.shippingCost,
-    this.paymentUrl,
-    this.shippingMethod,
     this.trackingNumber,
+    this.deliveryProof,
+    required this.deliveryStatus,
+    required this.tax,
+    required this.grandTotal,
+    required this.paymentStatus,
+    this.snapToken,
     this.createdAt,
-    this.details,
+    required this.transactionDetails,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
+    final store = json['store'];
     return TransactionModel(
       id: json['id'].toString(),
       code: json['code'] ?? '',
-      status: json['status'] ?? 'pending',
-      totalPrice: (json['total_price'] ?? 0) is int ? json['total_price'] ?? 0 : (json['total_price'] as num).toInt(),
-      shippingCost: (json['shipping_cost'] ?? 0) is int ? json['shipping_cost'] ?? 0 : (json['shipping_cost'] as num).toInt(),
-      paymentUrl: json['payment_url'],
-      shippingMethod: json['shipping_method'],
+      storeId: store != null ? store['id']?.toString() : null,
+      storeName: store != null ? store['name'] : null,
+      addressId: json['address_id']?.toString(),
+      address: json['address'],
+      city: json['city'],
+      postalCode: json['postal_code'],
+      destLatitude: json['dest_latitude'] != null ? (json['dest_latitude'] as num).toDouble() : null,
+      destLongitude: json['dest_longitude'] != null ? (json['dest_longitude'] as num).toDouble() : null,
+      shipping: json['shipping'],
+      shippingType: json['shipping_type'],
+      shippingCost: (json['shipping_cost'] ?? 0).toDouble(),
       trackingNumber: json['tracking_number'],
+      deliveryProof: json['delivery_proof'],
+      deliveryStatus: json['delivery_status'] ?? 'pending',
+      tax: (json['tax'] ?? 0).toDouble(),
+      grandTotal: (json['grand_total'] ?? 0).toDouble(),
+      paymentStatus: json['payment_status'] ?? 'pending',
+      snapToken: json['snap_token'],
       createdAt: json['created_at'],
-      details: json['details'] != null
-          ? (json['details'] as List)
+      transactionDetails: json['transaction_details'] != null
+          ? (json['transaction_details'] as List)
               .map((e) => TransactionDetailModel.fromJson(e))
               .toList()
-          : null,
+          : [],
     );
   }
 
-  int get grandTotal => totalPrice + shippingCost;
-
-  String get statusLabel {
-    switch (status) {
+  String get paymentStatusLabel {
+    switch (paymentStatus) {
       case 'pending':
         return 'Menunggu Pembayaran';
       case 'paid':
         return 'Dibayar';
-      case 'processing':
-        return 'Diproses';
-      case 'shipped':
-        return 'Dikirim';
-      case 'delivered':
-        return 'Diterima';
-      case 'completed':
-        return 'Selesai';
+      case 'failed':
+        return 'Gagal';
       case 'cancelled':
         return 'Dibatalkan';
       case 'expired':
         return 'Kedaluwarsa';
       default:
-        return status;
+        return paymentStatus;
+    }
+  }
+
+  String get deliveryStatusLabel {
+    switch (deliveryStatus) {
+      case 'pending':
+        return 'Menunggu Diproses';
+      case 'processing':
+        return 'Diproses';
+      case 'delivering':
+        return 'Dikirim';
+      case 'completed':
+        return 'Selesai';
+      default:
+        return deliveryStatus;
     }
   }
 }
@@ -71,30 +115,29 @@ class TransactionModel {
 class TransactionDetailModel {
   final String id;
   final String productId;
-  final String productName;
+  final String? productName;
   final String? productThumbnail;
-  final int price;
-  final int quantity;
+  final int qty;
+  final double subtotal;
 
   TransactionDetailModel({
     required this.id,
     required this.productId,
-    required this.productName,
+    this.productName,
     this.productThumbnail,
-    required this.price,
-    required this.quantity,
+    required this.qty,
+    required this.subtotal,
   });
 
   factory TransactionDetailModel.fromJson(Map<String, dynamic> json) {
+    final product = json['product'];
     return TransactionDetailModel(
       id: json['id'].toString(),
       productId: (json['product_id'] ?? '').toString(),
-      productName: json['product']?['name'] ?? json['product_name'] ?? '',
-      productThumbnail: json['product']?['thumbnail'],
-      price: (json['price'] ?? 0) is int ? json['price'] ?? 0 : (json['price'] as num).toInt(),
-      quantity: (json['quantity'] ?? 1) is int ? json['quantity'] ?? 1 : (json['quantity'] as num).toInt(),
+      productName: product != null ? product['name'] : null,
+      productThumbnail: product != null ? product['thumbnail'] : null,
+      qty: (json['qty'] ?? 1) is int ? json['qty'] ?? 1 : (json['qty'] as num).toInt(),
+      subtotal: (json['subtotal'] ?? 0).toDouble(),
     );
   }
-
-  int get subtotal => price * quantity;
 }
