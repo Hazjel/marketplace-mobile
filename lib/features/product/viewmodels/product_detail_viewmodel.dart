@@ -1,49 +1,73 @@
-import 'package:flutter/foundation.dart';
-import 'package:blukios_marketplace/features/home/data/product_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
-import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
 
-class ProductDetailViewModel extends ChangeNotifier {
-  final ProductRepository _productRepository;
-  final CartRepository _cartRepository;
+class ProductDetailData {
+  final ProductModel? product;
+  final bool isLoading;
+  final bool addingToCart;
+  final String? error;
 
-  ProductDetailViewModel(this._productRepository, this._cartRepository);
+  const ProductDetailData({
+    this.product,
+    this.isLoading = true,
+    this.addingToCart = false,
+    this.error,
+  });
 
-  ProductModel? product;
-  bool isLoading = true;
-  bool addingToCart = false;
-  String? error;
+  ProductDetailData copyWith({
+    ProductModel? product,
+    bool? isLoading,
+    bool? addingToCart,
+    String? error,
+    bool clearError = false,
+  }) {
+    return ProductDetailData(
+      product: product ?? this.product,
+      isLoading: isLoading ?? this.isLoading,
+      addingToCart: addingToCart ?? this.addingToCart,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
 
-  Future<void> loadProduct(String slug) async {
-    isLoading = true;
-    error = null;
-    notifyListeners();
+/// Keyed by product slug so each product detail screen gets its own state.
+class ProductDetailNotifier
+    extends AutoDisposeFamilyNotifier<ProductDetailData, String> {
+  @override
+  ProductDetailData build(String slug) => const ProductDetailData();
+
+  Future<void> loadProduct() async {
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      product = await _productRepository.getProductBySlug(slug);
+      final product =
+          await ref.read(productRepositoryProvider).getProductBySlug(arg);
+      state = state.copyWith(product: product, isLoading: false);
     } catch (e) {
-      error = e.toString();
-    } finally {
-      isLoading = false;
-      notifyListeners();
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   /// Returns null on success, or an error message on failure.
   Future<String?> addToCart() async {
+    final product = state.product;
     if (product == null) return 'Produk tidak ditemukan';
 
-    addingToCart = true;
-    notifyListeners();
+    state = state.copyWith(addingToCart: true);
 
     try {
-      await _cartRepository.addToCart(productId: product!.id);
+      await ref.read(cartRepositoryProvider).addToCart(productId: product.id);
       return null;
     } catch (e) {
       return e.toString();
     } finally {
-      addingToCart = false;
-      notifyListeners();
+      state = state.copyWith(addingToCart: false);
     }
   }
 }
+
+final productDetailProvider = AutoDisposeNotifierProviderFamily<
+    ProductDetailNotifier, ProductDetailData, String>(
+  ProductDetailNotifier.new,
+);

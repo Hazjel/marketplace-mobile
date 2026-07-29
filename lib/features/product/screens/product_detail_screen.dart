@@ -1,41 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:provider/provider.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
-import 'package:blukios_marketplace/features/home/data/product_repository.dart';
-import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
 import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class ProductDetailScreen extends StatelessWidget {
+class ProductDetailScreen extends ConsumerStatefulWidget {
   final String slug;
 
   const ProductDetailScreen({super.key, required this.slug});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ProductDetailViewModel>(
-      create: (ctx) {
-        final apiClient = ctx.read<ApiClient>();
-        return ProductDetailViewModel(
-          ProductRepository(apiClient),
-          CartRepository(apiClient),
-        )..loadProduct(slug);
-      },
-      child: _ProductDetailView(slug: slug),
-    );
-  }
+  ConsumerState<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailView extends StatelessWidget {
-  final String slug;
-
-  const _ProductDetailView({required this.slug});
+class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(productDetailProvider(widget.slug).notifier).loadProduct();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<ProductDetailViewModel>();
+    final slug = widget.slug;
+    final viewModel = ref.watch(productDetailProvider(slug));
 
     if (viewModel.isLoading) {
       return Scaffold(
@@ -56,7 +47,7 @@ class _ProductDetailView extends StatelessWidget {
               Text(viewModel.error ?? 'Produk tidak ditemukan'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => viewModel.loadProduct(slug),
+                onPressed: () => ref.read(productDetailProvider(slug).notifier).loadProduct(),
                 child: const Text('Coba Lagi'),
               ),
             ],
@@ -224,7 +215,8 @@ class _ProductDetailView extends StatelessWidget {
                   onPressed: viewModel.addingToCart
                       ? null
                       : () async {
-                          final error = await viewModel.addToCart();
+                          final error =
+                              await ref.read(productDetailProvider(slug).notifier).addToCart();
                           if (!context.mounted) return;
                           if (error == null) {
                             ScaffoldMessenger.of(context).showSnackBar(

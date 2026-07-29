@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/viewmodels/address_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class AddressListScreen extends StatefulWidget {
+class AddressListScreen extends ConsumerStatefulWidget {
   const AddressListScreen({super.key});
 
   @override
-  State<AddressListScreen> createState() => _AddressListScreenState();
+  ConsumerState<AddressListScreen> createState() => _AddressListScreenState();
 }
 
-class _AddressListScreenState extends State<AddressListScreen> {
+class _AddressListScreenState extends ConsumerState<AddressListScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AddressViewModel>().loadAddresses();
+      ref.read(addressProvider.notifier).loadAddresses();
     });
   }
 
-  Future<void> _delete(AddressViewModel viewModel, AddressModel address) async {
+  Future<void> _delete(AddressModel address) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -36,7 +36,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
     );
     if (confirmed != true) return;
 
-    final error = await viewModel.deleteAddress(address.id);
+    final error = await ref.read(addressProvider.notifier).deleteAddress(address.id);
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,7 +47,8 @@ class _AddressListScreenState extends State<AddressListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<AddressViewModel>();
+    final viewModel = ref.watch(addressProvider);
+    final notifier = ref.read(addressProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -66,7 +67,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                     children: [
                       Text(viewModel.error!),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: viewModel.loadAddresses, child: const Text('Coba Lagi')),
+                      ElevatedButton(onPressed: notifier.loadAddresses, child: const Text('Coba Lagi')),
                     ],
                   ),
                 )
@@ -90,13 +91,13 @@ class _AddressListScreenState extends State<AddressListScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final addr = viewModel.addresses[index];
-                        return _buildAddressCard(viewModel, addr);
+                        return _buildAddressCard(addr);
                       },
                     ),
     );
   }
 
-  Widget _buildAddressCard(AddressViewModel viewModel, AddressModel addr) {
+  Widget _buildAddressCard(AddressModel addr) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -126,7 +127,7 @@ class _AddressListScreenState extends State<AddressListScreen> {
                     if (value == 'edit') {
                       context.push(AppRoutes.addressForm, extra: addr);
                     } else if (value == 'delete') {
-                      _delete(viewModel, addr);
+                      _delete(addr);
                     }
                   },
                   itemBuilder: (_) => const [

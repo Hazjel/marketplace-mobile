@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/config/routes.dart';
@@ -9,7 +9,7 @@ import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_
 /// Midtrans has no Flutter Snap SDK; we load the same Snap web payment page
 /// used by fe-blue's snap.js popup inside an in-app webview instead, and
 /// detect completion from Midtrans's finish/unfinish/error redirect URLs.
-class PaymentWebviewScreen extends StatefulWidget {
+class PaymentWebviewScreen extends ConsumerStatefulWidget {
   final String transactionId;
   final String snapToken;
 
@@ -20,10 +20,10 @@ class PaymentWebviewScreen extends StatefulWidget {
   });
 
   @override
-  State<PaymentWebviewScreen> createState() => _PaymentWebviewScreenState();
+  ConsumerState<PaymentWebviewScreen> createState() => _PaymentWebviewScreenState();
 }
 
-class _PaymentWebviewScreenState extends State<PaymentWebviewScreen> {
+class _PaymentWebviewScreenState extends ConsumerState<PaymentWebviewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
   bool _finished = false;
@@ -64,7 +64,7 @@ class _PaymentWebviewScreenState extends State<PaymentWebviewScreen> {
     _finished = true;
 
     if (!mounted) return;
-    await context.read<TransactionViewModel>().refreshStatus(widget.transactionId);
+    await ref.read(transactionProvider.notifier).refreshStatus(widget.transactionId);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

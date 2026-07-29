@@ -1,28 +1,45 @@
-import 'package:flutter/foundation.dart';
-import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
-class TransactionViewModel extends ChangeNotifier {
-  final TransactionRepository _transactionRepository;
+class TransactionData {
+  final List<TransactionModel> transactions;
+  final bool isLoading;
+  final String? error;
 
-  TransactionViewModel(this._transactionRepository);
+  const TransactionData({
+    this.transactions = const [],
+    this.isLoading = true,
+    this.error,
+  });
 
-  List<TransactionModel> transactions = [];
-  bool isLoading = true;
-  String? error;
+  TransactionData copyWith({
+    List<TransactionModel>? transactions,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
+  }) {
+    return TransactionData(
+      transactions: transactions ?? this.transactions,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+class TransactionNotifier extends Notifier<TransactionData> {
+  @override
+  TransactionData build() => const TransactionData();
 
   Future<void> loadTransactions() async {
-    isLoading = true;
-    error = null;
-    notifyListeners();
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      transactions = await _transactionRepository.getTransactions();
+      final transactions =
+          await ref.read(transactionRepositoryProvider).getTransactions();
+      state = state.copyWith(transactions: transactions, isLoading: false);
     } catch (e) {
-      error = e.toString();
-    } finally {
-      isLoading = false;
-      notifyListeners();
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -30,12 +47,20 @@ class TransactionViewModel extends ChangeNotifier {
   /// updates it in place. Returns null on success, or an error message.
   Future<String?> refreshStatus(String id) async {
     try {
-      final updated = await _transactionRepository.checkPaymentStatus(id);
-      transactions = transactions.map((t) => t.id == id ? updated : t).toList();
-      notifyListeners();
+      final updated =
+          await ref.read(transactionRepositoryProvider).checkPaymentStatus(id);
+      state = state.copyWith(
+        transactions:
+            state.transactions.map((t) => t.id == id ? updated : t).toList(),
+      );
       return null;
     } catch (e) {
       return e.toString();
     }
   }
 }
+
+final transactionProvider =
+    NotifierProvider<TransactionNotifier, TransactionData>(
+  TransactionNotifier.new,
+);

@@ -1,57 +1,81 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/network/api_exceptions.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/core/storage/secure_storage.dart';
-import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
 import 'package:blukios_marketplace/features/auth/models/user_model.dart';
 
 enum AuthState { unknown, authenticated, unauthenticated }
 
-class AuthViewModel extends ChangeNotifier {
-  final AuthRepository _authRepository;
+class AuthData {
+  final AuthState state;
+  final UserModel? currentUser;
+  final bool isLoading;
+  final String? errorMessage;
 
-  AuthViewModel(this._authRepository);
+  const AuthData({
+    this.state = AuthState.unknown,
+    this.currentUser,
+    this.isLoading = false,
+    this.errorMessage,
+  });
 
-  AuthState state = AuthState.unknown;
-  UserModel? currentUser;
-  bool isLoading = false;
-  String? errorMessage;
+  AuthData copyWith({
+    AuthState? state,
+    UserModel? currentUser,
+    bool clearUser = false,
+    bool? isLoading,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return AuthData(
+      state: state ?? this.state,
+      currentUser: clearUser ? null : (currentUser ?? this.currentUser),
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+class AuthNotifier extends Notifier<AuthData> {
+  @override
+  AuthData build() => const AuthData();
 
   Future<void> checkAuthStatus() async {
     final token = await SecureStorage.getToken();
     if (token == null) {
-      state = AuthState.unauthenticated;
-      notifyListeners();
+      state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
       return;
     }
 
     try {
-      currentUser = await _authRepository.getProfile();
-      state = AuthState.authenticated;
+      final user = await ref.read(authRepositoryProvider).getProfile();
+      state = state.copyWith(state: AuthState.authenticated, currentUser: user);
     } catch (_) {
       await SecureStorage.clearAll();
-      state = AuthState.unauthenticated;
+      state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
     }
-    notifyListeners();
   }
 
   Future<bool> login(String email, String password) async {
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners();
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      currentUser = await _authRepository.login(email, password);
-      state = AuthState.authenticated;
+      final user = await ref.read(authRepositoryProvider).login(email, password);
+      state = state.copyWith(
+        state: AuthState.authenticated,
+        currentUser: user,
+        isLoading: false,
+      );
       return true;
     } on ApiException catch (e) {
-      errorMessage = e.message;
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
       return false;
     } catch (e) {
-      errorMessage = 'Terjadi kesalahan, coba lagi';
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Terjadi kesalahan, coba lagi',
+      );
       return false;
-    } finally {
-      isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -62,36 +86,39 @@ class AuthViewModel extends ChangeNotifier {
     required String phoneNumber,
     required String role,
   }) async {
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners();
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      currentUser = await _authRepository.register(
-        name: name,
-        email: email,
-        password: password,
-        phoneNumber: phoneNumber,
-        role: role,
+      final user = await ref.read(authRepositoryProvider).register(
+            name: name,
+            email: email,
+            password: password,
+            phoneNumber: phoneNumber,
+            role: role,
+          );
+      state = state.copyWith(
+        state: AuthState.authenticated,
+        currentUser: user,
+        isLoading: false,
       );
-      state = AuthState.authenticated;
       return true;
     } on ApiException catch (e) {
       String errorMsg = e.message;
       if (e.errors is Map) {
-        final fieldErrors = (e.errors as Map).values
+        final fieldErrors = (e.errors as Map)
+            .values
             .expand((v) => v is List ? v : [v])
             .join('\n');
         if (fieldErrors.isNotEmpty) errorMsg = fieldErrors;
       }
-      errorMessage = errorMsg;
+      state = state.copyWith(isLoading: false, errorMessage: errorMsg);
       return false;
     } catch (e) {
-      errorMessage = 'Terjadi kesalahan, coba lagi';
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Terjadi kesalahan, coba lagi',
+      );
       return false;
-    } finally {
-      isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -100,9 +127,13 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> refreshAfterExternalLogin() => checkAuthStatus();
 
   Future<void> logout() async {
-    await _authRepository.logout();
-    currentUser = null;
-    state = AuthState.unauthenticated;
-    notifyListeners();
+    await ref.read(authRepositoryProvider).logout();
+    state = state.copyWith(
+      state: AuthState.unauthenticated,
+      clearUser: true,
+      clearError: true,
+    );
   }
 }
+
+final authProvider = NotifierProvider<AuthNotifier, AuthData>(AuthNotifier.new);

@@ -1,45 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/config/routes.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
-import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
 import 'package:blukios_marketplace/features/checkout/viewmodels/checkout_viewmodel.dart';
-import 'package:blukios_marketplace/features/shipment/data/shipment_repository.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
-import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 
-class CheckoutScreen extends StatelessWidget {
+class CheckoutScreen extends ConsumerStatefulWidget {
   final CartGroupModel group;
 
   const CheckoutScreen({super.key, required this.group});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<CheckoutViewModel>(
-      create: (ctx) {
-        final apiClient = ctx.read<ApiClient>();
-        return CheckoutViewModel(
-          group,
-          AddressRepository(apiClient),
-          ShipmentRepository(apiClient),
-          TransactionRepository(apiClient),
-        )..loadSavedAddresses();
-      },
-      child: const _CheckoutView(),
-    );
-  }
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-class _CheckoutView extends StatelessWidget {
-  const _CheckoutView();
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(checkoutProvider(widget.group).notifier).loadSavedAddresses();
+    });
+  }
 
-  Future<void> _pickCourier(BuildContext context, CheckoutViewModel viewModel) async {
+  Future<void> _pickCourier(BuildContext context, CheckoutData viewModel) async {
+    final notifier = ref.read(checkoutProvider(widget.group).notifier);
     if (viewModel.selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pilih alamat terlebih dahulu')),
@@ -47,12 +37,13 @@ class _CheckoutView extends StatelessWidget {
       return;
     }
 
-    await viewModel.calculateShipping();
+    await notifier.calculateShipping();
     if (!context.mounted) return;
 
-    if (viewModel.shippingError != null) {
+    final refreshed = ref.read(checkoutProvider(widget.group));
+    if (refreshed.shippingError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(viewModel.shippingError!), backgroundColor: const Color(0xFFEF4444)),
+        SnackBar(content: Text(refreshed.shippingError!), backgroundColor: const Color(0xFFEF4444)),
       );
       return;
     }
@@ -60,13 +51,13 @@ class _CheckoutView extends StatelessWidget {
     if (!context.mounted) return;
     await showModalBottomSheet(
       context: context,
-      builder: (_) => _CourierSheet(viewModel: viewModel),
+      builder: (_) => _CourierSheet(group: widget.group),
     );
   }
 
-  Future<void> _submit(BuildContext context, CheckoutViewModel viewModel) async {
-    final authViewModel = context.read<AuthViewModel>();
-    final buyerId = authViewModel.currentUser?.buyer?.id;
+  Future<void> _submit(BuildContext context, CheckoutData viewModel) async {
+    final auth = ref.read(authProvider);
+    final buyerId = auth.currentUser?.buyer?.id;
 
     if (buyerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,13 +66,15 @@ class _CheckoutView extends StatelessWidget {
       return;
     }
 
-    final transaction = await viewModel.submit(buyerId: buyerId);
+    final notifier = ref.read(checkoutProvider(widget.group).notifier);
+    final transaction = await notifier.submit(buyerId: buyerId);
     if (!context.mounted) return;
 
     if (transaction == null) {
+      final refreshed = ref.read(checkoutProvider(widget.group));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(viewModel.submitError ?? 'Gagal membuat transaksi'),
+          content: Text(refreshed.submitError ?? 'Gagal membuat transaksi'),
           backgroundColor: const Color(0xFFEF4444),
         ),
       );
@@ -90,7 +83,7 @@ class _CheckoutView extends StatelessWidget {
 
     // Transaction is committed server-side; drop this store's cart items now
     // to avoid double-ordering, matching the web checkout's behavior.
-    context.read<CartViewModel>().removeGroup(viewModel.group.storeId);
+    ref.read(cartProvider.notifier).removeGroup(viewModel.group.storeId);
 
     if (transaction.snapToken == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,7 +98,8 @@ class _CheckoutView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<CheckoutViewModel>();
+    final viewModel = ref.watch(checkoutProvider(widget.group));
+    final notifier = ref.read(checkoutProvider(widget.group).notifier);
     final group = viewModel.group;
 
     return Scaffold(
@@ -131,7 +125,7 @@ class _CheckoutView extends StatelessWidget {
                             OutlinedButton(
                               onPressed: () async {
                                 await context.push(AppRoutes.addressForm);
-                                if (context.mounted) viewModel.loadSavedAddresses();
+                                if (context.mounted) notifier.loadSavedAddresses();
                               },
                               child: const Text('Tambah Alamat'),
                             ),
@@ -140,7 +134,7 @@ class _CheckoutView extends StatelessWidget {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: viewModel.savedAddresses
-                              .map((addr) => _buildAddressTile(context, viewModel, addr))
+                              .map((addr) => _buildAddressTile(context, viewModel, notifier, addr))
                               .toList(),
                         ),
             ),
@@ -239,10 +233,15 @@ class _CheckoutView extends StatelessWidget {
     );
   }
 
-  Widget _buildAddressTile(BuildContext context, CheckoutViewModel viewModel, AddressModel addr) {
+  Widget _buildAddressTile(
+    BuildContext context,
+    CheckoutData viewModel,
+    CheckoutNotifier notifier,
+    AddressModel addr,
+  ) {
     final isSelected = viewModel.selectedAddress?.id == addr.id;
     return InkWell(
-      onTap: () => viewModel.selectAddress(addr),
+      onTap: () => notifier.selectAddress(addr),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
@@ -308,13 +307,15 @@ class _CheckoutView extends StatelessWidget {
   }
 }
 
-class _CourierSheet extends StatelessWidget {
-  final CheckoutViewModel viewModel;
+class _CourierSheet extends ConsumerWidget {
+  final CartGroupModel group;
 
-  const _CourierSheet({required this.viewModel});
+  const _CourierSheet({required this.group});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final viewModel = ref.watch(checkoutProvider(group));
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -332,7 +333,7 @@ class _CourierSheet extends StatelessWidget {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final courier = viewModel.couriers[index];
-                  return _buildCourierTile(context, courier);
+                  return _buildCourierTile(context, ref, courier);
                 },
               ),
             ),
@@ -342,7 +343,7 @@ class _CourierSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildCourierTile(BuildContext context, CourierOptionModel courier) {
+  Widget _buildCourierTile(BuildContext context, WidgetRef ref, CourierOptionModel courier) {
     return ListTile(
       title: Text(courier.shippingName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       subtitle: Text(courier.serviceName, style: const TextStyle(fontSize: 12)),
@@ -351,7 +352,7 @@ class _CourierSheet extends StatelessWidget {
         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
       ),
       onTap: () {
-        viewModel.selectCourier(courier);
+        ref.read(checkoutProvider(group).notifier).selectCourier(courier);
         Navigator.of(context).pop();
       },
     );

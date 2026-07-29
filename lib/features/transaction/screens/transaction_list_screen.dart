@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class TransactionListScreen extends StatefulWidget {
+class TransactionListScreen extends ConsumerStatefulWidget {
   const TransactionListScreen({super.key});
 
   @override
-  State<TransactionListScreen> createState() => _TransactionListScreenState();
+  ConsumerState<TransactionListScreen> createState() => _TransactionListScreenState();
 }
 
-class _TransactionListScreenState extends State<TransactionListScreen> {
+class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TransactionViewModel>().loadTransactions();
+      ref.read(transactionProvider.notifier).loadTransactions();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<TransactionViewModel>();
+    final viewModel = ref.watch(transactionProvider);
+    final notifier = ref.read(transactionProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -42,7 +43,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       Text(viewModel.error!),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: viewModel.loadTransactions,
+                        onPressed: notifier.loadTransactions,
                         child: const Text('Coba Lagi'),
                       ),
                     ],
@@ -68,22 +69,22 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: viewModel.loadTransactions,
+                      onRefresh: notifier.loadTransactions,
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: viewModel.transactions.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final trx = viewModel.transactions[index];
-                          return _buildTransactionCard(viewModel, trx);
+                          return _buildTransactionCard(trx);
                         },
                       ),
                     ),
     );
   }
 
-  Future<void> _refreshStatus(TransactionViewModel viewModel, TransactionModel trx) async {
-    final error = await viewModel.refreshStatus(trx.id);
+  Future<void> _refreshStatus(TransactionModel trx) async {
+    final error = await ref.read(transactionProvider.notifier).refreshStatus(trx.id);
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -92,7 +93,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     }
   }
 
-  Widget _buildTransactionCard(TransactionViewModel viewModel, TransactionModel trx) {
+  Widget _buildTransactionCard(TransactionModel trx) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -148,7 +149,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => _refreshStatus(viewModel, trx),
+                  onPressed: () => _refreshStatus(trx),
                   child: const Text('Cek Status Pembayaran'),
                 ),
               ),

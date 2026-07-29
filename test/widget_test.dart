@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:blukios_marketplace/app.dart';
@@ -10,7 +11,7 @@ void main() {
     // runAsync lets those requests actually fail (connection refused) instead
     // of leaving a pending timer behind at teardown.
     await tester.runAsync(() async {
-      await tester.pumpWidget(const BlukiosApp());
+      await tester.pumpWidget(const ProviderScope(child: BlukiosApp()));
       await tester.pump();
     });
 

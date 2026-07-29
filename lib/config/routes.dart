@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/screens/address_form_screen.dart';
@@ -28,19 +30,22 @@ class AppRoutes {
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
 
-  static GoRouter build(AuthViewModel authViewModel) {
+  static GoRouter build(Ref ref) {
     return GoRouter(
       initialLocation: home,
-      refreshListenable: authViewModel,
+      refreshListenable: _AuthRefreshListenable(ref),
       redirect: (context, state) {
-        final authState = authViewModel.state;
-        if (authState == AuthState.unknown) return null;
+        final auth = ref.read(authProvider);
+        if (auth.state == AuthState.unknown) return null;
 
-        final isAuthenticated = authState == AuthState.authenticated;
+        final isAuthenticated = auth.state == AuthState.authenticated;
         final isAuthRoute = state.matchedLocation == login || state.matchedLocation == register;
 
         if (!isAuthenticated && !isAuthRoute) return login;
         if (isAuthenticated && isAuthRoute) return home;
+
+        // Seller routes are not part of the buyer build yet. When
+        // lib/features/seller/ lands, gate it here on auth.currentUser?.role.
         return null;
       },
       routes: [
@@ -97,3 +102,18 @@ class AppRoutes {
     );
   }
 }
+
+/// Bridges Riverpod's auth state onto the [Listenable] GoRouter expects,
+/// so a login/logout re-runs the redirect.
+class _AuthRefreshListenable extends ChangeNotifier {
+  _AuthRefreshListenable(Ref ref) {
+    ref.listen<AuthData>(
+      authProvider,
+      (previous, next) {
+        if (previous?.state != next.state) notifyListeners();
+      },
+    );
+  }
+}
+
+final routerProvider = Provider<GoRouter>((ref) => AppRoutes.build(ref));

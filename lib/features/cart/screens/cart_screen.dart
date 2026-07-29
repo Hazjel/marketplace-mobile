@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class CartScreen extends StatefulWidget {
+class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
 
   @override
-  State<CartScreen> createState() => _CartScreenState();
+  ConsumerState<CartScreen> createState() => _CartScreenState();
 }
 
-class _CartScreenState extends State<CartScreen> {
+class _CartScreenState extends ConsumerState<CartScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CartViewModel>().loadCart();
+      ref.read(cartProvider.notifier).loadCart();
     });
   }
 
-  Future<void> _removeItem(CartViewModel viewModel, CartItemModel item) async {
-    final error = await viewModel.removeItem(item.productId, variantId: item.variantId);
+  Future<void> _removeItem(CartItemModel item) async {
+    final error = await ref
+        .read(cartProvider.notifier)
+        .removeItem(item.productId, variantId: item.variantId);
     if (!mounted) return;
     if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,7 +42,8 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<CartViewModel>();
+    final viewModel = ref.watch(cartProvider);
+    final notifier = ref.read(cartProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,7 +58,7 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       Text(viewModel.error!),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: viewModel.loadCart, child: const Text('Coba Lagi')),
+                      ElevatedButton(onPressed: notifier.loadCart, child: const Text('Coba Lagi')),
                     ],
                   ),
                 )
@@ -79,21 +82,21 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: viewModel.loadCart,
+                      onRefresh: notifier.loadCart,
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: viewModel.groups.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final group = viewModel.groups[index];
-                          return _buildStoreGroup(viewModel, group);
+                          return _buildStoreGroup(group);
                         },
                       ),
                     ),
     );
   }
 
-  Widget _buildStoreGroup(CartViewModel viewModel, CartGroupModel group) {
+  Widget _buildStoreGroup(CartGroupModel group) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -120,7 +123,7 @@ class _CartScreenState extends State<CartScreen> {
           // Items
           ...group.items.map((item) => Padding(
                 padding: const EdgeInsets.all(12),
-                child: _buildCartItem(viewModel, item),
+                child: _buildCartItem(item),
               )),
 
           const Divider(height: 1),
@@ -158,7 +161,7 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCartItem(CartViewModel viewModel, CartItemModel item) {
+  Widget _buildCartItem(CartItemModel item) {
     return Row(
       children: [
         // Product image
@@ -213,7 +216,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => _removeItem(viewModel, item),
+                    onTap: () => _removeItem(item),
                     child: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
                   ),
                 ],

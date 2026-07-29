@@ -1,164 +1,211 @@
-import 'package:flutter/foundation.dart';
-import 'package:blukios_marketplace/features/address/data/address_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
-import 'package:blukios_marketplace/features/shipment/data/shipment_repository.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
-import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
-class CheckoutViewModel extends ChangeNotifier {
+class CheckoutData {
   final CartGroupModel group;
-  final AddressRepository _addressRepository;
-  final ShipmentRepository _shipmentRepository;
-  final TransactionRepository _transactionRepository;
+  final List<AddressModel> savedAddresses;
+  final bool isLoadingAddresses;
+  final AddressModel? selectedAddress;
+  final List<CourierOptionModel> couriers;
+  final CourierOptionModel? selectedCourier;
+  final bool isCalculatingShipping;
+  final String? shippingError;
+  final bool isSubmitting;
+  final String? submitError;
 
-  CheckoutViewModel(
-    this.group,
-    this._addressRepository,
-    this._shipmentRepository,
-    this._transactionRepository,
-  );
-
-  List<AddressModel> savedAddresses = [];
-  bool isLoadingAddresses = true;
-
-  AddressModel? selectedAddress;
-
-  List<CourierOptionModel> couriers = [];
-  CourierOptionModel? selectedCourier;
-  bool isCalculatingShipping = false;
-  String? shippingError;
-
-  bool isSubmitting = false;
-  String? submitError;
+  const CheckoutData({
+    required this.group,
+    this.savedAddresses = const [],
+    this.isLoadingAddresses = true,
+    this.selectedAddress,
+    this.couriers = const [],
+    this.selectedCourier,
+    this.isCalculatingShipping = false,
+    this.shippingError,
+    this.isSubmitting = false,
+    this.submitError,
+  });
 
   double get subtotal => group.subtotal;
   double get tax => (subtotal * 0.11).roundToDouble();
   double get shippingCost => selectedCourier?.shippingCostNet ?? 0;
   double get grandTotal => subtotal + tax + shippingCost;
 
+  CheckoutData copyWith({
+    List<AddressModel>? savedAddresses,
+    bool? isLoadingAddresses,
+    AddressModel? selectedAddress,
+    List<CourierOptionModel>? couriers,
+    CourierOptionModel? selectedCourier,
+    bool clearSelectedCourier = false,
+    bool? isCalculatingShipping,
+    String? shippingError,
+    bool clearShippingError = false,
+    bool? isSubmitting,
+    String? submitError,
+    bool clearSubmitError = false,
+  }) {
+    return CheckoutData(
+      group: group,
+      savedAddresses: savedAddresses ?? this.savedAddresses,
+      isLoadingAddresses: isLoadingAddresses ?? this.isLoadingAddresses,
+      selectedAddress: selectedAddress ?? this.selectedAddress,
+      couriers: couriers ?? this.couriers,
+      selectedCourier:
+          clearSelectedCourier ? null : (selectedCourier ?? this.selectedCourier),
+      isCalculatingShipping:
+          isCalculatingShipping ?? this.isCalculatingShipping,
+      shippingError:
+          clearShippingError ? null : (shippingError ?? this.shippingError),
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      submitError: clearSubmitError ? null : (submitError ?? this.submitError),
+    );
+  }
+}
+
+/// Keyed by the cart group being checked out, so each checkout screen has
+/// isolated state and is disposed when the screen closes.
+class CheckoutNotifier
+    extends AutoDisposeFamilyNotifier<CheckoutData, CartGroupModel> {
+  @override
+  CheckoutData build(CartGroupModel group) => CheckoutData(group: group);
+
   Future<void> loadSavedAddresses() async {
-    isLoadingAddresses = true;
-    notifyListeners();
+    state = state.copyWith(isLoadingAddresses: true);
 
     try {
-      savedAddresses = await _addressRepository.getAddresses();
-      final primary = savedAddresses.where((a) => a.isPrimary);
-      if (primary.isNotEmpty) {
-        selectAddress(primary.first);
-      } else if (savedAddresses.isNotEmpty) {
-        selectAddress(savedAddresses.first);
-      }
+      final addresses = await ref.read(addressRepositoryProvider).getAddresses();
+      final primary = addresses.where((a) => a.isPrimary);
+      final preselected = primary.isNotEmpty
+          ? primary.first
+          : (addresses.isNotEmpty ? addresses.first : null);
+
+      state = state.copyWith(
+        savedAddresses: addresses,
+        selectedAddress: preselected,
+        isLoadingAddresses: false,
+        // Selecting an address invalidates any previously fetched shipping.
+        couriers: const [],
+        clearSelectedCourier: true,
+        clearShippingError: true,
+      );
     } catch (_) {
-      savedAddresses = [];
-    } finally {
-      isLoadingAddresses = false;
-      notifyListeners();
+      state = state.copyWith(
+        savedAddresses: const [],
+        isLoadingAddresses: false,
+      );
     }
   }
 
   void selectAddress(AddressModel address) {
-    selectedAddress = address;
-    _resetShipping();
-    notifyListeners();
-  }
-
-  void _resetShipping() {
-    couriers = [];
-    selectedCourier = null;
-    shippingError = null;
+    state = state.copyWith(
+      selectedAddress: address,
+      couriers: const [],
+      clearSelectedCourier: true,
+      clearShippingError: true,
+    );
   }
 
   Future<void> calculateShipping() async {
-    final shipperId = group.storeAddressId;
-    final address = selectedAddress;
+    final shipperId = state.group.storeAddressId;
+    final address = state.selectedAddress;
 
     if (shipperId == null) {
-      shippingError = 'Alamat toko tidak tersedia. Tidak bisa menghitung ongkir.';
-      notifyListeners();
+      state = state.copyWith(
+        shippingError: 'Alamat toko tidak tersedia. Tidak bisa menghitung ongkir.',
+      );
       return;
     }
     if (address == null) {
-      shippingError = 'Pilih alamat pengiriman terlebih dahulu';
-      notifyListeners();
+      state = state.copyWith(
+        shippingError: 'Pilih alamat pengiriman terlebih dahulu',
+      );
       return;
     }
 
-    isCalculatingShipping = true;
-    shippingError = null;
-    notifyListeners();
+    state = state.copyWith(
+      isCalculatingShipping: true,
+      clearShippingError: true,
+    );
 
     try {
-      couriers = await _shipmentRepository.calculate(
-        shipperDestinationId: shipperId,
-        receiverDestinationId: address.cityId,
-        itemValue: subtotal,
-        weight: group.totalWeight,
-        receiverCityName: address.city,
+      final couriers = await ref.read(shipmentRepositoryProvider).calculate(
+            shipperDestinationId: shipperId,
+            receiverDestinationId: address.cityId,
+            itemValue: state.subtotal,
+            weight: state.group.totalWeight,
+            receiverCityName: address.city,
+          );
+
+      state = state.copyWith(
+        couriers: couriers,
+        isCalculatingShipping: false,
+        shippingError: couriers.isEmpty
+            ? 'Kurir tidak tersedia untuk alamat ini. Coba pilih ulang alamat dengan kecamatan/kota yang lebih umum.'
+            : null,
       );
-      if (couriers.isEmpty) {
-        shippingError =
-            'Kurir tidak tersedia untuk alamat ini. Coba pilih ulang alamat dengan kecamatan/kota yang lebih umum.';
-      }
     } catch (e) {
-      shippingError = 'Gagal menghitung ongkir. Silakan coba lagi.';
-    } finally {
-      isCalculatingShipping = false;
-      notifyListeners();
+      state = state.copyWith(
+        isCalculatingShipping: false,
+        shippingError: 'Gagal menghitung ongkir. Silakan coba lagi.',
+      );
     }
   }
 
   void selectCourier(CourierOptionModel courier) {
-    selectedCourier = courier;
-    notifyListeners();
+    state = state.copyWith(selectedCourier: courier);
   }
 
   /// Returns the created transaction on success, or null on failure
-  /// (with [submitError] populated).
+  /// (with [CheckoutData.submitError] populated).
   Future<TransactionModel?> submit({required String buyerId}) async {
-    final address = selectedAddress;
-    final courier = selectedCourier;
+    final address = state.selectedAddress;
+    final courier = state.selectedCourier;
 
     if (address == null) {
-      submitError = 'Pilih alamat pengiriman terlebih dahulu';
-      notifyListeners();
+      state = state.copyWith(submitError: 'Pilih alamat pengiriman terlebih dahulu');
       return null;
     }
     if (courier == null) {
-      submitError = 'Pilih kurir terlebih dahulu';
-      notifyListeners();
+      state = state.copyWith(submitError: 'Pilih kurir terlebih dahulu');
       return null;
     }
 
-    isSubmitting = true;
-    submitError = null;
-    notifyListeners();
+    state = state.copyWith(isSubmitting: true, clearSubmitError: true);
 
     try {
-      final transaction = await _transactionRepository.createTransaction(
-        buyerId: buyerId,
-        storeId: group.storeId,
-        addressId: address.cityId,
-        address: address.address,
-        city: address.city,
-        postalCode: address.postalCode,
-        destLatitude: address.latitude,
-        destLongitude: address.longitude,
-        shipping: courier.shippingName,
-        shippingType: courier.serviceName,
-        shippingCost: courier.shippingCostNet,
-        products: group.items
-            .map((item) => {'product_id': item.productId, 'qty': item.quantity})
-            .toList(),
-      );
+      final transaction =
+          await ref.read(transactionRepositoryProvider).createTransaction(
+                buyerId: buyerId,
+                storeId: state.group.storeId,
+                addressId: address.cityId,
+                address: address.address,
+                city: address.city,
+                postalCode: address.postalCode,
+                destLatitude: address.latitude,
+                destLongitude: address.longitude,
+                shipping: courier.shippingName,
+                shippingType: courier.serviceName,
+                shippingCost: courier.shippingCostNet,
+                products: state.group.items
+                    .map((item) =>
+                        {'product_id': item.productId, 'qty': item.quantity})
+                    .toList(),
+              );
+      state = state.copyWith(isSubmitting: false);
       return transaction;
     } catch (e) {
-      submitError = e.toString();
+      state = state.copyWith(isSubmitting: false, submitError: e.toString());
       return null;
-    } finally {
-      isSubmitting = false;
-      notifyListeners();
     }
   }
 }
+
+final checkoutProvider = AutoDisposeNotifierProviderFamily<CheckoutNotifier,
+    CheckoutData, CartGroupModel>(
+  CheckoutNotifier.new,
+);

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -32,7 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await context.read<AuthViewModel>().register(
+    await ref.read(authProvider.notifier).register(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -43,9 +43,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authViewModel = context.watch<AuthViewModel>();
-    final errorMessage = authViewModel.errorMessage;
-    final isLoading = authViewModel.isLoading;
+    final auth = ref.watch(authProvider);
+    final errorMessage = auth.errorMessage;
+    final isLoading = auth.isLoading;
 
     return Scaffold(
       appBar: AppBar(

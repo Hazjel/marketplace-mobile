@@ -2,22 +2,22 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/storage/secure_storage.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await SecureStorage.saveToken(token);
       if (mounted) {
-        await context.read<AuthViewModel>().refreshAfterExternalLogin();
+        await ref.read(authProvider.notifier).refreshAfterExternalLogin();
       }
     } catch (e) {
       setState(() => _googleErrorMessage = 'Gagal menyimpan sesi login');
@@ -80,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    await context.read<AuthViewModel>().login(
+    await ref.read(authProvider.notifier).login(
           _emailController.text.trim(),
           _passwordController.text,
         );
@@ -110,9 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authViewModel = context.watch<AuthViewModel>();
-    final errorMessage = _googleErrorMessage ?? authViewModel.errorMessage;
-    final isLoading = authViewModel.isLoading;
+    final auth = ref.watch(authProvider);
+    final errorMessage = _googleErrorMessage ?? auth.errorMessage;
+    final isLoading = auth.isLoading;
 
     return Scaffold(
       body: SafeArea(

@@ -68,7 +68,28 @@ class CartGroupModel {
     );
   }
 
+  CartGroupModel copyWith({List<CartItemModel>? items}) {
+    return CartGroupModel(
+      storeId: storeId,
+      storeName: storeName,
+      storeLogo: storeLogo,
+      storeAddressId: storeAddressId,
+      items: items ?? this.items,
+    );
+  }
+
   double get subtotal => items.fold(0, (sum, item) => sum + item.subtotal);
   double get totalWeight => items.fold(0, (sum, item) => sum + (item.weight * item.quantity));
   int get itemCount => items.length;
+
+  // Value equality on storeId: checkoutProvider is a family keyed by this
+  // model, and Riverpod caches family state by argument equality. Identity
+  // equality would spawn a fresh CheckoutNotifier on every rebuild.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CartGroupModel && other.storeId == storeId);
+
+  @override
+  int get hashCode => storeId.hashCode;
 }

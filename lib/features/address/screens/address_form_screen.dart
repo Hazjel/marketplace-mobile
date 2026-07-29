@@ -1,23 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:blukios_marketplace/core/network/api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/viewmodels/address_viewmodel.dart';
-import 'package:blukios_marketplace/features/shipment/data/shipment_repository.dart';
 import 'package:blukios_marketplace/features/shipment/models/shipment_destination_model.dart';
 
-class AddressFormScreen extends StatefulWidget {
+class AddressFormScreen extends ConsumerStatefulWidget {
   final AddressModel? existing;
 
   const AddressFormScreen({super.key, this.existing});
 
   @override
-  State<AddressFormScreen> createState() => _AddressFormScreenState();
+  ConsumerState<AddressFormScreen> createState() => _AddressFormScreenState();
 }
 
-class _AddressFormScreenState extends State<AddressFormScreen> {
+class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final _labelController = TextEditingController(text: widget.existing?.label);
   late final _recipientController = TextEditingController(text: widget.existing?.recipientName);
@@ -32,7 +31,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   double? _longitude;
   bool _isPrimary = false;
 
-  late final ShipmentRepository _shipmentRepository = ShipmentRepository(context.read<ApiClient>());
   List<ShipmentDestinationModel> _destinationOptions = [];
   bool _showDestinationOptions = false;
   bool _searchingDestination = false;
@@ -79,7 +77,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       setState(() => _searchingDestination = true);
       try {
-        final results = await _shipmentRepository.searchDestination(value.trim());
+        final results =
+            await ref.read(shipmentRepositoryProvider).searchDestination(value.trim());
         if (!mounted) return;
         setState(() {
           _destinationOptions = results;
@@ -127,10 +126,10 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       isPrimary: _isPrimary,
     );
 
-    final viewModel = context.read<AddressViewModel>();
+    final notifier = ref.read(addressProvider.notifier);
     final error = _isEditing
-        ? await viewModel.updateAddress(widget.existing!.id, address)
-        : await viewModel.createAddress(address);
+        ? await notifier.updateAddress(widget.existing!.id, address)
+        : await notifier.createAddress(address);
 
     if (!mounted) return;
     if (error == null) {
@@ -142,7 +141,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<AddressViewModel>();
+    final viewModel = ref.watch(addressProvider);
 
     return Scaffold(
       appBar: AppBar(

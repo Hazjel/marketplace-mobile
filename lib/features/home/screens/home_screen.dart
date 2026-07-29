@@ -1,31 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/responsive.dart';
 import 'package:blukios_marketplace/features/home/viewmodels/home_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HomeViewModel>().loadData();
+      ref.read(homeProvider.notifier).loadData();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<HomeViewModel>();
+    final viewModel = ref.watch(homeProvider);
+    final notifier = ref.read(homeProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -53,9 +54,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: viewModel.isLoading
           ? const LoadingWidget()
           : viewModel.error != null
-              ? _buildError(viewModel)
+              ? _buildError(viewModel, notifier)
               : RefreshIndicator(
-                  onRefresh: viewModel.loadData,
+                  onRefresh: notifier.loadData,
                   child: CustomScrollView(
                     slivers: [
                       // Search Bar
@@ -71,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderSide: BorderSide.none,
                               ),
                             ),
-                            onSubmitted: (query) => viewModel.search(query.trim()),
+                            onSubmitted: (query) => notifier.search(query.trim()),
                           ),
                         ),
                       ),
@@ -175,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildError(HomeViewModel viewModel) {
+  Widget _buildError(HomeData viewModel, HomeNotifier notifier) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -191,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: viewModel.loadData,
+              onPressed: notifier.loadData,
               child: const Text('Coba Lagi'),
             ),
           ],

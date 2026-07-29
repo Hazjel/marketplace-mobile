@@ -1,42 +1,70 @@
-import 'package:flutter/foundation.dart';
-import 'package:blukios_marketplace/features/home/data/product_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/home/models/category_model.dart';
 
-class HomeViewModel extends ChangeNotifier {
-  final ProductRepository _productRepository;
+class HomeData {
+  final List<ProductModel> products;
+  final List<CategoryModel> categories;
+  final bool isLoading;
+  final String? error;
+  final String searchQuery;
 
-  HomeViewModel(this._productRepository);
+  const HomeData({
+    this.products = const [],
+    this.categories = const [],
+    this.isLoading = true,
+    this.error,
+    this.searchQuery = '',
+  });
 
-  List<ProductModel> products = [];
-  List<CategoryModel> categories = [];
-  bool isLoading = true;
-  String? error;
-  String searchQuery = '';
+  HomeData copyWith({
+    List<ProductModel>? products,
+    List<CategoryModel>? categories,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
+    String? searchQuery,
+  }) {
+    return HomeData(
+      products: products ?? this.products,
+      categories: categories ?? this.categories,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+      searchQuery: searchQuery ?? this.searchQuery,
+    );
+  }
+}
+
+class HomeNotifier extends Notifier<HomeData> {
+  @override
+  HomeData build() => const HomeData();
 
   Future<void> loadData() async {
-    isLoading = true;
-    error = null;
-    notifyListeners();
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
+      final repository = ref.read(productRepositoryProvider);
+      final query = state.searchQuery;
       final results = await Future.wait([
-        _productRepository.getProducts(search: searchQuery.isEmpty ? null : searchQuery),
-        _productRepository.getCategories(),
+        repository.getProducts(search: query.isEmpty ? null : query),
+        repository.getCategories(),
       ]);
 
-      products = results[0] as List<ProductModel>;
-      categories = results[1] as List<CategoryModel>;
+      state = state.copyWith(
+        products: results[0] as List<ProductModel>,
+        categories: results[1] as List<CategoryModel>,
+        isLoading: false,
+      );
     } catch (e) {
-      error = e.toString();
-    } finally {
-      isLoading = false;
-      notifyListeners();
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> search(String query) async {
-    searchQuery = query;
+    state = state.copyWith(searchQuery: query);
     await loadData();
   }
 }
+
+final homeProvider = NotifierProvider<HomeNotifier, HomeData>(HomeNotifier.new);
