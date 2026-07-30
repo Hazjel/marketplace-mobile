@@ -14,6 +14,7 @@ import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
+import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String payment = '/payment/:transactionId';
   static const String addresses = '/addresses';
   static const String addressForm = '/addresses/form';
+  static const String search = '/search';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -96,6 +98,12 @@ class AppRoutes {
           path: addressForm,
           builder: (context, state) => AddressFormScreen(
             existing: state.extra as AddressModel?,
+          ),
+        ),
+        GoRoute(
+          path: search,
+          builder: (context, state) => SearchScreen(
+            initialQuery: state.uri.queryParameters['q'],
           ),
         ),
       ],
