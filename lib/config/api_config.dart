@@ -38,4 +38,41 @@ class ApiConfig {
   static const String health = '/health';
 
   static String transactionCheckStatus(String id) => '/transaction/$id/check-status';
+
+  // Search & filters (3a)
+  static const String productSearch = '/product/all/paginated';
+
+  // Category browse (3b)
+  static const String categoriesPaginated = '/product-category/all/paginated';
+  static String categoryBySlug(String slug) => '/product-category/slug/$slug';
+
+  // Wishlist (3c) — POST is a toggle, returns { status: "added" | "removed" }
+  // GET /wishlist and POST /wishlist already defined above
+
+  // Store detail & follow (3d)
+  static String storeByUsername(String username) => '/store/username/$username';
+  static String storeCategories(String id) => '/store/$id/categories';
+  static String storeReviews(String id) => '/store/$id/reviews';
+  static String storeFollow(String id) => '/store/$id/follow';
+  static String storeUnfollow(String id) => '/store/$id/unfollow';
+  static String storeFollowStatus(String id) => '/store/$id/follow-status';
+  static const String storeLocations = '/store/locations';
+
+  // Product reviews (3e)
+  static const String productReviews = '/product-review';
+  static const String productReviewsPaginated = '/product-review/all/paginated';
+
+  // Profile & settings (3f)
+  static const String profile = '/profile';
+  static const String profileSettings = '/profile/settings';
+
+  // Buyer dashboard (3g)
+  static const String buyerDashboard = '/buyer/dashboard/summary';
+
+  // Chat (3h)
+  static const String chatContacts = '/chat/contacts';
+  static String chatMessages(String userId) => '/chat/$userId';
+  static const String chatSend = '/chat/send';
+  static String chatUser(String id) => '/chat/user/$id';
+  static const String broadcastAuth = '/broadcasting/auth';
 }
