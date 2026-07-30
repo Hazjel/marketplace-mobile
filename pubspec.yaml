@@ -32,3 +32,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+# path_provider_android >=2.3.0 switched to JNI-based codegen (jni/jni_flutter)
+# whose generated bindings reference a `java.io.File` shim that isn't present
+# in the published package — it fails to compile in this Flutter/Dart SDK
+# combo. 2.2.x uses the older, stable Pigeon codegen.
+dependency_overrides:
+  path_provider_android: 2.2.17
