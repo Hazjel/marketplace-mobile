@@ -42,6 +42,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.favorite_border_rounded),
+            onPressed: () => context.push(AppRoutes.wishlist),
+          ),
+          IconButton(
             icon: const Icon(Icons.shopping_cart_outlined),
             onPressed: () => context.push(AppRoutes.cart),
           ),
@@ -79,12 +83,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       // Categories
                       if (viewModel.categories.isNotEmpty) ...[
-                        const SliverToBoxAdapter(
+                        SliverToBoxAdapter(
                           child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              'Kategori',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Kategori',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                                ),
+                                TextButton(
+                                  onPressed: () => context.push(AppRoutes.categories),
+                                  child: const Text('Lihat Semua'),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -97,7 +110,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               itemCount: viewModel.categories.length,
                               itemBuilder: (context, index) {
                                 final cat = viewModel.categories[index];
-                                return Container(
+                                return GestureDetector(
+                                  onTap: () => context.push(
+                                    AppRoutes.search,
+                                    extra: {
+                                      'categoryId': cat.id,
+                                      'categoryName': cat.name,
+                                    },
+                                  ),
+                                  child: Container(
                                   width: 80,
                                   margin: const EdgeInsets.symmetric(horizontal: 4),
                                   child: Column(
@@ -126,6 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         ),
                                       ),
                                     ],
+                                  ),
                                   ),
                                 );
                               },

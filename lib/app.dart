@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
 
 class BlukiosApp extends ConsumerStatefulWidget {
   const BlukiosApp({super.key});
@@ -19,6 +20,17 @@ class _BlukiosAppState extends ConsumerState<BlukiosApp> {
     // resolves the router sees AuthState.unknown and holds its decision.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authProvider.notifier).checkAuthStatus();
+    });
+
+    // Preload wishlist membership once per session as soon as we know the
+    // user is authenticated, so heart icons on product cards render correct
+    // state on first paint instead of only after visiting the wishlist tab.
+    ref.listenManual<AuthData>(authProvider, (previous, next) {
+      final justAuthenticated = previous?.state != AuthState.authenticated &&
+          next.state == AuthState.authenticated;
+      if (justAuthenticated) {
+        ref.read(wishlistProvider.notifier).loadWishlist();
+      }
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
+import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
@@ -57,10 +58,24 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     }
 
     final product = viewModel.product!;
+    final wishlistState = ref.watch(wishlistProvider);
+    final isWishlisted = wishlistState.productIds.contains(product.id);
+    final isTogglingWishlist = wishlistState.pendingIds.contains(product.id);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detail Produk'),
+        actions: [
+          IconButton(
+            onPressed: isTogglingWishlist
+                ? null
+                : () => ref.read(wishlistProvider.notifier).toggle(product),
+            icon: Icon(
+              isWishlisted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              color: isWishlisted ? const Color(0xFFEF4444) : null,
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(

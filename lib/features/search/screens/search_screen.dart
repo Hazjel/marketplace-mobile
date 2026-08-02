@@ -10,8 +10,15 @@ import 'package:blukios_marketplace/shared/widgets/product_card.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String? initialQuery;
+  final String? initialCategoryId;
+  final String? initialCategoryName;
 
-  const SearchScreen({super.key, this.initialQuery});
+  const SearchScreen({
+    super.key,
+    this.initialQuery,
+    this.initialCategoryId,
+    this.initialCategoryName,
+  });
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -35,6 +42,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final initialFilters = SearchFilters.empty.copyWith(
         search: widget.initialQuery,
+        productCategoryId: widget.initialCategoryId,
       );
       ref.read(searchFilterProvider.notifier).updateFilters(initialFilters);
     });
@@ -120,7 +128,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => _submitSearch(),
         decoration: InputDecoration(
-          hintText: 'Cari produk...',
+          hintText: widget.initialCategoryName != null
+              ? 'Cari di ${widget.initialCategoryName}...'
+              : 'Cari produk...',
           hintStyle: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
           prefixIcon: const Icon(Icons.search_rounded, size: 20),
           suffixIcon: _searchController.text.isNotEmpty

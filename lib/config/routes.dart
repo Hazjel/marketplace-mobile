@@ -15,6 +15,8 @@ import 'package:blukios_marketplace/features/product/screens/product_detail_scre
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
+import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -28,6 +30,8 @@ class AppRoutes {
   static const String addresses = '/addresses';
   static const String addressForm = '/addresses/form';
   static const String search = '/search';
+  static const String categories = '/categories';
+  static const String wishlist = '/wishlist';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -102,9 +106,23 @@ class AppRoutes {
         ),
         GoRoute(
           path: search,
-          builder: (context, state) => SearchScreen(
-            initialQuery: state.uri.queryParameters['q'],
-          ),
+          builder: (context, state) {
+            final extra = state.extra;
+            final categoryArgs = extra is Map ? extra : const {};
+            return SearchScreen(
+              initialQuery: state.uri.queryParameters['q'],
+              initialCategoryId: categoryArgs['categoryId'] as String?,
+              initialCategoryName: categoryArgs['categoryName'] as String?,
+            );
+          },
+        ),
+        GoRoute(
+          path: categories,
+          builder: (context, state) => const CategoryBrowseScreen(),
+        ),
+        GoRoute(
+          path: wishlist,
+          builder: (context, state) => const WishlistScreen(),
         ),
       ],
     );

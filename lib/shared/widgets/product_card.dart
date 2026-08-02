@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
+import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends ConsumerWidget {
   final ProductModel product;
   final VoidCallback? onTap;
 
   const ProductCard({super.key, required this.product, this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wishlistState = ref.watch(wishlistProvider);
+    final isWishlisted = wishlistState.productIds.contains(product.id);
+    final isPending = wishlistState.pendingIds.contains(product.id);
+
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -21,33 +27,59 @@ class ProductCard extends StatelessWidget {
             // Image
             Expanded(
               flex: 3,
-              child: SizedBox(
-                width: double.infinity,
-                child: product.thumbnail != null
-                    ? CachedNetworkImage(
-                        imageUrl: product.thumbnail!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: const Color(0xFFF3F4F6),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: product.thumbnail != null
+                        ? CachedNetworkImage(
+                            imageUrl: product.thumbnail!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              color: const Color(0xFFF3F4F6),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              color: const Color(0xFFF3F4F6),
+                              child: const Icon(Icons.image_outlined, color: Color(0xFF9CA3AF)),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFFF3F4F6),
+                            child: const Center(
+                              child: Icon(Icons.image_outlined, size: 32, color: Color(0xFF9CA3AF)),
                             ),
                           ),
+                  ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: isPending
+                          ? null
+                          : () => ref.read(wishlistProvider.notifier).toggle(product),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          shape: BoxShape.circle,
                         ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: const Color(0xFFF3F4F6),
-                          child: const Icon(Icons.image_outlined, color: Color(0xFF9CA3AF)),
-                        ),
-                      )
-                    : Container(
-                        color: const Color(0xFFF3F4F6),
-                        child: const Center(
-                          child: Icon(Icons.image_outlined, size: 32, color: Color(0xFF9CA3AF)),
+                        child: Icon(
+                          isWishlisted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          size: 16,
+                          color: isWishlisted ? const Color(0xFFEF4444) : const Color(0xFF6B7280),
                         ),
                       ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
