@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
-import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
+import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
+import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
+import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -29,15 +33,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         .read(cartProvider.notifier)
         .removeItem(item.productId, variantId: item.variantId);
     if (!mounted) return;
-    if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produk dihapus dari keranjang')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: const Color(0xFFEF4444)),
-      );
-    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error ?? 'Produk dihapus dari keranjang'),
+        backgroundColor: error == null ? null : AppTheme.error,
+      ),
+    );
   }
 
   @override
@@ -45,92 +47,89 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final viewModel = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Keranjang'),
-      ),
+    return AppScaffold(
+      title: 'Keranjang',
       body: viewModel.isLoading
-          ? const LoadingWidget()
+          ? const ListSkeleton()
           : viewModel.error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(viewModel.error!),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: notifier.loadCart, child: const Text('Coba Lagi')),
-                    ],
-                  ),
+              ? ErrorState(
+                  message: viewModel.error!,
+                  onRetry: notifier.loadCart,
                 )
               : viewModel.groups.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.shopping_cart_outlined, size: 64, color: Color(0xFF9CA3AF)),
-                          SizedBox(height: 16),
-                          Text(
-                            'Keranjang kosong',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Yuk mulai belanja!',
-                            style: TextStyle(color: Color(0xFF6B7280)),
-                          ),
-                        ],
-                      ),
+                  ? EmptyState(
+                      icon: AppIcons.cart,
+                      title: 'Keranjang kosong',
+                      message: 'Yuk mulai belanja!',
+                      actionLabel: 'Lihat Produk',
+                      onAction: () => context.go(AppRoutes.home),
                     )
                   : RefreshIndicator(
                       onRefresh: notifier.loadCart,
                       child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(AppTheme.spacingLG),
                         itemCount: viewModel.groups.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          final group = viewModel.groups[index];
-                          return _buildStoreGroup(group);
-                        },
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppTheme.spacingLG),
+                        itemBuilder: (context, index) => _StoreGroup(
+                          group: viewModel.groups[index],
+                          onRemoveItem: _removeItem,
+                        ),
                       ),
                     ),
     );
   }
+}
 
-  Widget _buildStoreGroup(CartGroupModel group) {
-    return Card(
+class _StoreGroup extends StatelessWidget {
+  final CartGroupModel group;
+  final Future<void> Function(CartItemModel) onRemoveItem;
+
+  const _StoreGroup({required this.group, required this.onRemoveItem});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.border;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(AppTheme.radius2XL),
+        border: Border.all(color: borderColor),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Store header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            color: const Color(0xFFF9FAFB),
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            color: isDark ? AppTheme.darkMuted : AppTheme.surface,
             child: Row(
               children: [
-                const Icon(Icons.storefront_outlined, size: 16, color: Color(0xFF6B7280)),
-                const SizedBox(width: 8),
+                AppIcon(AppIcons.store, size: AppIconSize.sm, color: muted),
+                const SizedBox(width: AppTheme.spacingSM),
                 Expanded(
                   child: Text(
                     group.storeName,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.titleSm,
                   ),
                 ),
               ],
             ),
           ),
-
-          // Items
-          ...group.items.map((item) => Padding(
-                padding: const EdgeInsets.all(12),
-                child: _buildCartItem(item),
-              )),
-
-          const Divider(height: 1),
-
-          // Group subtotal + checkout
+          ...group.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.all(AppTheme.spacingMD),
+              child: _CartItem(item: item, onRemove: () => onRemoveItem(item)),
+            ),
+          ),
+          Divider(height: 1, color: borderColor),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -138,19 +137,21 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Subtotal', style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                    Text(
+                      'Subtotal',
+                      style: AppTheme.labelSm.copyWith(color: muted),
+                    ),
                     Text(
                       CurrencyFormatter.formatRupiah(group.subtotal),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2563EB),
+                      style: AppTheme.priceSm.copyWith(
+                        color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
                       ),
                     ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: () => context.push(AppRoutes.checkout, extra: group),
+                FilledButton(
+                  onPressed: () =>
+                      context.push(AppRoutes.checkout, extra: group),
                   child: const Text('Checkout'),
                 ),
               ],
@@ -160,13 +161,25 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
     );
   }
+}
 
-  Widget _buildCartItem(CartItemModel item) {
+class _CartItem extends StatelessWidget {
+  final CartItemModel item;
+  final VoidCallback onRemove;
+
+  const _CartItem({required this.item, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final placeholder = isDark ? AppTheme.darkMuted : const Color(0xFFF3F4F6);
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Product image
         ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLG),
           child: SizedBox(
             width: 64,
             height: 64,
@@ -175,19 +188,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     imageUrl: item.productThumbnail!,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
-                      color: const Color(0xFFF3F4F6),
-                      child: const Icon(Icons.image_outlined, size: 24),
+                      color: placeholder,
+                      child: Center(
+                        child: AppIcon(AppIcons.imageOff,
+                            size: AppIconSize.md, color: muted),
+                      ),
                     ),
                   )
                 : Container(
-                    color: const Color(0xFFF3F4F6),
-                    child: const Icon(Icons.image_outlined, size: 24, color: Color(0xFF9CA3AF)),
+                    color: placeholder,
+                    child: Center(
+                      child: AppIcon(AppIcons.image,
+                          size: AppIconSize.md, color: muted),
+                    ),
                   ),
           ),
         ),
-        const SizedBox(width: 12),
-
-        // Product info
+        const SizedBox(width: AppTheme.spacingMD),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,15 +213,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 item.productName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: AppTheme.bodyMd,
               ),
               const SizedBox(height: 4),
               Text(
                 CurrencyFormatter.formatRupiah(item.price),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2563EB),
+                style: AppTheme.priceSm.copyWith(
+                  color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -212,12 +227,18 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 children: [
                   Text(
                     'Qty: ${item.quantity}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    style: AppTheme.labelSm.copyWith(color: muted),
                   ),
                   const Spacer(),
-                  GestureDetector(
-                    onTap: () => _removeItem(item),
-                    child: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
+                  IconButton(
+                    onPressed: onRemove,
+                    visualDensity: VisualDensity.compact,
+                    icon: const AppIcon(
+                      AppIcons.trash,
+                      size: AppIconSize.md,
+                      color: AppTheme.error,
+                      semanticsLabel: 'Hapus dari keranjang',
+                    ),
                   ),
                 ],
               ),

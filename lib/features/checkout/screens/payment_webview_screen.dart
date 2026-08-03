@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 
 /// Midtrans has no Flutter Snap SDK; we load the same Snap web payment page
 /// used by fe-blue's snap.js popup inside an in-app webview instead, and
@@ -85,7 +86,11 @@ class _PaymentWebviewScreenState extends ConsumerState<PaymentWebviewScreen> {
         appBar: AppBar(
           title: const Text('Pembayaran'),
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const AppIcon(
+              AppIcons.close,
+              size: AppIconSize.lg,
+              semanticsLabel: 'Tutup pembayaran',
+            ),
             onPressed: () => _handleResult(
               'Popup ditutup. Pesanan tetap aktif — selesaikan pembayaran di menu Transaksi.',
               const Color(0xFFCA8A04),

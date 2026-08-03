@@ -31,7 +31,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/
+    - assets/icons/
+    - assets/brand/
 
 # path_provider_android >=2.3.0 switched to JNI-based codegen (jni/jni_flutter)
 # whose generated bindings reference a `java.io.File` shim that isn't present

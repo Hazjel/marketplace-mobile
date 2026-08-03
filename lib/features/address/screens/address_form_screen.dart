@@ -6,6 +6,7 @@ import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/viewmodels/address_viewmodel.dart';
 import 'package:blukios_marketplace/features/shipment/models/shipment_destination_model.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 
 class AddressFormScreen extends ConsumerStatefulWidget {
   final AddressModel? existing;
@@ -204,7 +205,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           )
-                        : const Icon(Icons.search),
+                        : const AppIcon(AppIcons.search, size: AppIconSize.md),
                   ),
                   onChanged: _onDestinationSearchChanged,
                 ),

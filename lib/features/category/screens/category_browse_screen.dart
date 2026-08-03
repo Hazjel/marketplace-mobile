@@ -6,12 +6,16 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/category/models/category_detail_model.dart';
 import 'package:blukios_marketplace/features/category/viewmodels/category_viewmodel.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
+import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
+import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 class CategoryBrowseScreen extends ConsumerStatefulWidget {
   const CategoryBrowseScreen({super.key});
 
   @override
-  ConsumerState<CategoryBrowseScreen> createState() => _CategoryBrowseScreenState();
+  ConsumerState<CategoryBrowseScreen> createState() =>
+      _CategoryBrowseScreenState();
 }
 
 class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
@@ -26,10 +30,7 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
   void _openCategory(CategoryDetailModel category) {
     context.push(
       AppRoutes.search,
-      extra: {
-        'categoryId': category.id,
-        'categoryName': category.name,
-      },
+      extra: {'categoryId': category.id, 'categoryName': category.name},
     );
   }
 
@@ -37,55 +38,41 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(categoryListProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Kategori')),
+    return AppScaffold(
+      title: 'Kategori',
+      isTabRoot: true,
       body: _buildBody(state),
     );
   }
 
   Widget _buildBody(CategoryListData state) {
+    final reload = ref.read(categoryListProvider.notifier).loadCategories;
+
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (state.error != null && state.categories.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline_rounded,
-                  size: 48, color: AppTheme.error.withValues(alpha: 0.7)),
-              const SizedBox(height: 12),
-              Text(state.error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textSecondary)),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => ref.read(categoryListProvider.notifier).loadCategories(),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Coba Lagi'),
-              ),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: state.error!, onRetry: reload);
     }
 
     if (state.categories.isEmpty) {
-      return const Center(child: Text('Belum ada kategori'));
+      return const EmptyState(
+        icon: AppIcons.layers,
+        title: 'Belum ada kategori',
+        message: 'Kategori produk akan muncul di sini',
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(categoryListProvider.notifier).loadCategories(),
+      onRefresh: reload,
       child: GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppTheme.spacingLG),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          childAspectRatio: 0.85,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 16,
+          childAspectRatio: 0.82,
+          crossAxisSpacing: AppTheme.spacingMD,
+          mainAxisSpacing: AppTheme.spacingLG,
         ),
         itemCount: state.categories.length,
         itemBuilder: (context, index) {
@@ -108,9 +95,12 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppTheme.radiusXLCard),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -118,32 +108,52 @@ class _CategoryTile extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: AppTheme.primaryLight,
-              borderRadius: BorderRadius.circular(16),
+              color: isDark
+                  ? AppTheme.darkIconBackground
+                  : AppTheme.iconBackground,
+              borderRadius: BorderRadius.circular(AppTheme.radius2XL),
             ),
             clipBehavior: Clip.antiAlias,
             child: category.image != null
                 ? CachedNetworkImage(
                     imageUrl: category.image!,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => const Icon(
-                      Icons.category_outlined,
-                      color: AppTheme.primary,
-                    ),
+                    errorWidget: (_, __, ___) => const _TileFallback(),
                   )
-                : const Icon(Icons.category_outlined, color: AppTheme.primary),
+                : const _TileFallback(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppTheme.spacingSM),
           Flexible(
             child: Text(
               category.name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              style: AppTheme.titleSm,
             ),
           ),
+          if (category.productCount > 0)
+            Text(
+              '${category.productCount} produk',
+              style: AppTheme.labelSm.copyWith(color: muted),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _TileFallback extends StatelessWidget {
+  const _TileFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: AppIcon(
+        AppIcons.layers,
+        size: AppIconSize.lg,
+        color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
       ),
     );
   }

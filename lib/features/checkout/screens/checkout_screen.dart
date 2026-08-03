@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/config/routes.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
@@ -192,7 +193,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
                         ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right, size: 20),
+                      const AppIcon(AppIcons.chevronRight, size: AppIconSize.md),
                     ],
                   ),
                 ),

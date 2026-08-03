@@ -6,7 +6,9 @@ import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/pagination/paged_notifier.dart';
 import 'package:blukios_marketplace/features/search/models/search_filters.dart';
 import 'package:blukios_marketplace/features/search/viewmodels/search_viewmodel.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
+import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String? initialQuery;
@@ -94,7 +96,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.tune_rounded),
+                icon: const AppIcon(AppIcons.filter, size: AppIconSize.lg, semanticsLabel: 'Filter'),
                 onPressed: _showFilterSheet,
                 tooltip: 'Filter',
               ),
@@ -132,10 +134,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ? 'Cari di ${widget.initialCategoryName}...'
               : 'Cari produk...',
           hintStyle: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+          prefixIcon: const Padding(padding: EdgeInsets.all(10), child: AppIcon(AppIcons.search, size: AppIconSize.md)),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  icon: const AppIcon(AppIcons.close, size: AppIconSize.sm, semanticsLabel: 'Hapus pencarian'),
                   onPressed: () {
                     _searchController.clear();
                     _submitSearch();
@@ -163,64 +165,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     // Error state
     if (searchState.error != null && searchState.items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline_rounded, size: 48,
-                  color: AppTheme.error.withValues(alpha: 0.7)),
-              const SizedBox(height: 12),
-              Text(searchState.error!, textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textSecondary)),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => ref.read(searchResultsProvider.notifier).loadFirstPage(),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Coba Lagi'),
-              ),
-            ],
-          ),
-        ),
+      return ErrorState(
+        message: searchState.error!,
+        onRetry: () => ref.read(searchResultsProvider.notifier).loadFirstPage(),
       );
     }
 
     // Empty state
     if (searchState.items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.search_off_rounded, size: 40,
-                    color: AppTheme.primary.withValues(alpha: 0.6)),
-              ),
-              const SizedBox(height: 16),
-              const Text('Tidak ada produk ditemukan',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              const Text('Coba ubah kata kunci atau filter pencarian',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-              if (filters.hasActiveFilters) ...[
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => ref.read(searchFilterProvider.notifier).clearAll(),
-                  icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
-                  label: const Text('Hapus Filter'),
-                ),
-              ],
-            ],
-          ),
-        ),
+      return EmptyState(
+        icon: AppIcons.searchEmpty,
+        title: 'Tidak ada produk ditemukan',
+        message: 'Coba ubah kata kunci atau filter pencarian',
+        actionLabel: filters.hasActiveFilters ? 'Hapus Filter' : null,
+        onAction: filters.hasActiveFilters
+            ? () => ref.read(searchFilterProvider.notifier).clearAll()
+            : null,
       );
     }
 

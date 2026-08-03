@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/viewmodels/address_viewmodel.dart';
-import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
+import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
+import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
+import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 class AddressListScreen extends ConsumerStatefulWidget {
   const AddressListScreen({super.key});
@@ -25,22 +29,30 @@ class _AddressListScreenState extends ConsumerState<AddressListScreen> {
   Future<void> _delete(AddressModel address) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Hapus Alamat'),
         content: Text('Hapus alamat "${address.label}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Hapus')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            child: const Text('Hapus'),
+          ),
         ],
       ),
     );
     if (confirmed != true) return;
 
-    final error = await ref.read(addressProvider.notifier).deleteAddress(address.id);
+    final error =
+        await ref.read(addressProvider.notifier).deleteAddress(address.id);
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: const Color(0xFFEF4444)),
+        SnackBar(content: Text(error), backgroundColor: AppTheme.error),
       );
     }
   }
@@ -50,105 +62,139 @@ class _AddressListScreenState extends ConsumerState<AddressListScreen> {
     final viewModel = ref.watch(addressProvider);
     final notifier = ref.read(addressProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Alamat Saya'),
-      ),
+    return AppScaffold(
+      title: 'Alamat Saya',
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push(AppRoutes.addressForm),
-        child: const Icon(Icons.add),
+        child: const AppIcon(
+          AppIcons.plus,
+          size: AppIconSize.lg,
+          color: Colors.white,
+          semanticsLabel: 'Tambah alamat',
+        ),
       ),
       body: viewModel.isLoading
-          ? const LoadingWidget()
+          ? const ListSkeleton()
           : viewModel.error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(viewModel.error!),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: notifier.loadAddresses, child: const Text('Coba Lagi')),
-                    ],
-                  ),
+              ? ErrorState(
+                  message: viewModel.error!,
+                  onRetry: notifier.loadAddresses,
                 )
               : viewModel.addresses.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.location_off_outlined, size: 64, color: Color(0xFF9CA3AF)),
-                          SizedBox(height: 16),
-                          Text(
-                            'Belum ada alamat tersimpan',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
+                  ? EmptyState(
+                      icon: AppIcons.mapPinOff,
+                      title: 'Belum ada alamat',
+                      message: 'Tambahkan alamat untuk mempercepat checkout',
+                      actionLabel: 'Tambah Alamat',
+                      onAction: () => context.push(AppRoutes.addressForm),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.spacingLG,
+                        AppTheme.spacingLG,
+                        AppTheme.spacingLG,
+                        88, // clears the FAB
+                      ),
                       itemCount: viewModel.addresses.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final addr = viewModel.addresses[index];
-                        return _buildAddressCard(addr);
-                      },
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppTheme.spacingMD),
+                      itemBuilder: (context, index) => _AddressCard(
+                        address: viewModel.addresses[index],
+                        onDelete: _delete,
+                      ),
                     ),
     );
   }
+}
 
-  Widget _buildAddressCard(AddressModel addr) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(addr.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                if (addr.isPrimary) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'UTAMA',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+class _AddressCard extends StatelessWidget {
+  final AddressModel address;
+  final Future<void> Function(AddressModel) onDelete;
+
+  const _AddressCard({required this.address, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingLG),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(AppTheme.radius2XL),
+        border: Border.all(
+          color: address.isPrimary
+              ? (isDark ? AppTheme.darkPrimary : AppTheme.primary)
+              : (isDark ? AppTheme.darkBorder : AppTheme.border),
+          width: address.isPrimary ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIcon(AppIcons.mapPin, size: AppIconSize.sm, color: muted),
+              const SizedBox(width: 6),
+              Text(address.label, style: AppTheme.titleSm),
+              if (address.isPrimary) ...[
+                const SizedBox(width: AppTheme.spacingSM),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.darkIconBackground
+                        : AppTheme.iconBackground,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  ),
+                  child: Text(
+                    'UTAMA',
+                    style: AppTheme.labelSm.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
                     ),
                   ),
-                ],
-                const Spacer(),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      context.push(AppRoutes.addressForm, extra: addr);
-                    } else if (value == 'delete') {
-                      _delete(addr);
-                    }
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    PopupMenuItem(value: 'delete', child: Text('Hapus')),
-                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${addr.recipientName} (${addr.phone})',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${addr.address}, ${addr.city} ${addr.postalCode}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-            ),
-          ],
-        ),
+              const Spacer(),
+              PopupMenuButton<String>(
+                icon: AppIcon(
+                  AppIcons.settings,
+                  size: AppIconSize.md,
+                  color: muted,
+                  semanticsLabel: 'Opsi alamat',
+                ),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    context.push(AppRoutes.addressForm, extra: address);
+                  } else if (value == 'delete') {
+                    onDelete(address);
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Hapus', style: TextStyle(color: AppTheme.error)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingSM),
+          Text(
+            '${address.recipientName} · ${address.phone}',
+            style: AppTheme.bodyMd,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${address.address}, ${address.city} ${address.postalCode}',
+            style: AppTheme.bodySm.copyWith(color: muted),
+          ),
+        ],
       ),
     );
   }

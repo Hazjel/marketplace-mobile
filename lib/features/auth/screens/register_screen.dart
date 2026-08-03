@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -69,7 +70,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   'Isi data di bawah untuk memulai',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -96,7 +97,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     hintText: 'Nama Lengkap',
-                    prefixIcon: Icon(Icons.person_outline),
+                    prefixIcon: FieldIcon(AppIcons.user),
                   ),
                   validator: (v) => (v == null || v.isEmpty) ? 'Nama wajib diisi' : null,
                 ),
@@ -109,7 +110,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     hintText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
+                    prefixIcon: FieldIcon(AppIcons.mail),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Email wajib diisi';
@@ -126,7 +127,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     hintText: 'Nomor Telepon',
-                    prefixIcon: Icon(Icons.phone_outlined),
+                    prefixIcon: FieldIcon(AppIcons.phone),
                   ),
                   validator: (v) => (v == null || v.isEmpty) ? 'Nomor telepon wajib diisi' : null,
                 ),
@@ -173,9 +174,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     hintText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                    prefixIcon: const FieldIcon(AppIcons.lock),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      icon: AppIcon(_obscurePassword ? AppIcons.eyeOff : AppIcons.eye, size: AppIconSize.md),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
@@ -194,7 +195,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
                     hintText: 'Konfirmasi Password',
-                    prefixIcon: Icon(Icons.lock_outline),
+                    prefixIcon: FieldIcon(AppIcons.lock),
                   ),
                   validator: (v) {
                     if (v != _passwordController.text) return 'Password tidak cocok';
@@ -226,7 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     Text(
                       'Sudah punya akun? ',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     GestureDetector(

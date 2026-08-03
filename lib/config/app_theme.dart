@@ -73,6 +73,101 @@ class AppTheme {
   static const double spacingXXL = 32.0;
 
   // ─────────────────────────────────────────
+  // TEXT STYLES
+  // ─────────────────────────────────────────
+  //
+  // Named styles so screens stop hardcoding `TextStyle(fontSize: …)`.
+  // Colors are omitted deliberately — they inherit from the surrounding
+  // DefaultTextStyle so the same token works in light and dark mode.
+  // Add `.copyWith(color: …)` only when a specific color is meant.
+
+  static TextStyle get displayLg => GoogleFonts.plusJakartaSans(
+        fontSize: 28,
+        fontWeight: FontWeight.w800,
+        height: 1.2,
+        letterSpacing: -0.5,
+      );
+
+  static TextStyle get displayMd => GoogleFonts.plusJakartaSans(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        height: 1.25,
+        letterSpacing: -0.3,
+      );
+
+  static TextStyle get titleLg => GoogleFonts.plusJakartaSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        height: 1.3,
+      );
+
+  static TextStyle get titleMd => GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
+      );
+
+  static TextStyle get titleSm => GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.4,
+      );
+
+  static TextStyle get bodyLg => GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+        height: 1.55,
+      );
+
+  static TextStyle get bodyMd => GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        height: 1.5,
+      );
+
+  static TextStyle get bodySm => GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+      );
+
+  static TextStyle get labelMd => GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+      );
+
+  static TextStyle get labelSm => GoogleFonts.plusJakartaSans(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        height: 1.3,
+      );
+
+  /// Prices use tabular figures so digits stay column-aligned and the
+  /// layout doesn't jitter as amounts change.
+  static TextStyle get priceLg => GoogleFonts.plusJakartaSans(
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        height: 1.2,
+        letterSpacing: -0.3,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  static TextStyle get priceMd => GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        height: 1.25,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  static TextStyle get priceSm => GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        height: 1.25,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
+  // ─────────────────────────────────────────
   // GRADIENTS (matches web CSS)
   // ─────────────────────────────────────────
 
@@ -96,7 +191,7 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: primary,
       secondary: secondary,
       surface: surface,
@@ -213,7 +308,7 @@ class AppTheme {
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: darkPrimary,
       secondary: secondary,
       surface: darkSurface,

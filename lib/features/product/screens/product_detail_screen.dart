@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
+import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
 import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
-import 'package:blukios_marketplace/shared/widgets/loading_widget.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
+import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
+import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
+import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String slug;
@@ -12,7 +17,8 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
   const ProductDetailScreen({super.key, required this.slug});
 
   @override
-  ConsumerState<ProductDetailScreen> createState() => _ProductDetailScreenState();
+  ConsumerState<ProductDetailScreen> createState() =>
+      _ProductDetailScreenState();
 }
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
@@ -24,243 +30,329 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     });
   }
 
+  Future<void> _addToCart() async {
+    final error =
+        await ref.read(productDetailProvider(widget.slug).notifier).addToCart();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error ?? 'Produk ditambahkan ke keranjang'),
+        backgroundColor: error == null ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final slug = widget.slug;
     final viewModel = ref.watch(productDetailProvider(slug));
+    final notifier = ref.read(productDetailProvider(slug).notifier);
 
     if (viewModel.isLoading) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const LoadingWidget(),
-      );
+      return const AppScaffold(title: 'Detail Produk', body: DetailSkeleton());
     }
 
     if (viewModel.error != null || viewModel.product == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
-              const SizedBox(height: 16),
-              Text(viewModel.error ?? 'Produk tidak ditemukan'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.read(productDetailProvider(slug).notifier).loadProduct(),
-                child: const Text('Coba Lagi'),
-              ),
-            ],
-          ),
+      return AppScaffold(
+        title: 'Detail Produk',
+        body: ErrorState(
+          message: viewModel.error ?? 'Produk tidak ditemukan',
+          onRetry: notifier.loadProduct,
         ),
       );
     }
 
     final product = viewModel.product!;
-    final wishlistState = ref.watch(wishlistProvider);
-    final isWishlisted = wishlistState.productIds.contains(product.id);
-    final isTogglingWishlist = wishlistState.pendingIds.contains(product.id);
+    final wishlist = ref.watch(wishlistProvider);
+    final isWishlisted = wishlist.productIds.contains(product.id);
+    final isToggling = wishlist.pendingIds.contains(product.id);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detail Produk'),
-        actions: [
-          IconButton(
-            onPressed: isTogglingWishlist
-                ? null
-                : () => ref.read(wishlistProvider.notifier).toggle(product),
-            icon: Icon(
-              isWishlisted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: isWishlisted ? const Color(0xFFEF4444) : null,
-            ),
+    return AppScaffold(
+      title: 'Detail Produk',
+      actions: [
+        IconButton(
+          onPressed: isToggling
+              ? null
+              : () => ref.read(wishlistProvider.notifier).toggle(product),
+          icon: AppIcon(
+            isWishlisted ? AppIcons.heartFilled : AppIcons.heart,
+            size: AppIconSize.lg,
+            color: isWishlisted ? AppTheme.error : null,
+            semanticsLabel:
+                isWishlisted ? 'Hapus dari wishlist' : 'Tambah ke wishlist',
           ),
-        ],
+        ),
+        const SizedBox(width: AppTheme.spacingXS),
+      ],
+      bottomBar: _AddToCartBar(
+        isAdding: viewModel.addingToCart,
+        isOutOfStock: product.stock <= 0,
+        onAdd: _addToCart,
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product image
-            AspectRatio(
-              aspectRatio: 1,
-              child: product.thumbnail != null
-                  ? CachedNetworkImage(
-                      imageUrl: product.thumbnail!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                        color: const Color(0xFFF3F4F6),
-                        child: const Center(child: CircularProgressIndicator()),
-                      ),
-                      errorWidget: (_, __, ___) => Container(
-                        color: const Color(0xFFF3F4F6),
-                        child: const Icon(Icons.image_not_supported, size: 48),
-                      ),
-                    )
-                  : Container(
-                      color: const Color(0xFFF3F4F6),
-                      child: const Center(
-                        child: Icon(Icons.image_outlined, size: 64, color: Color(0xFF9CA3AF)),
-                      ),
-                    ),
-            ),
-
+            _ProductImage(thumbnail: product.thumbnail),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppTheme.spacingLG),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Price
                   Text(
                     CurrencyFormatter.formatRupiah(product.price),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF2563EB),
+                    style: AppTheme.priceLg.copyWith(
+                      color:
+                          isDark ? AppTheme.darkPrimary : AppTheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  // Name
-                  Text(
-                    product.name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Stats row
-                  Row(
-                    children: [
-                      const Icon(Icons.sell_outlined, size: 14, color: Color(0xFF6B7280)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Terjual ${product.totalSold}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                      ),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF6B7280)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Stok ${product.stock}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          product.condition == 'new' ? 'Baru' : 'Bekas',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 16),
-
-                  // Store info
+                  const SizedBox(height: AppTheme.spacingSM),
+                  Text(product.name, style: AppTheme.titleLg),
+                  const SizedBox(height: AppTheme.spacingMD),
+                  _StatsRow(product: product),
+                  const SizedBox(height: AppTheme.spacingLG),
+                  const Divider(height: 1),
                   if (product.store != null) ...[
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFFEFF6FF),
-                          child: Text(
-                            product.store!.name.isNotEmpty ? product.store!.name[0].toUpperCase() : 'S',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.store!.name,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                            ),
-                            const Text(
-                              'Lihat Toko',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF2563EB)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
+                    _StoreRow(store: product.store!),
+                    const Divider(height: 1),
                   ],
-
-                  // Description
-                  const Text(
-                    'Deskripsi',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppTheme.spacingLG),
+                  Text('Deskripsi', style: AppTheme.titleMd),
+                  const SizedBox(height: AppTheme.spacingSM),
                   Text(
                     product.description ?? 'Tidak ada deskripsi',
-                    style: const TextStyle(fontSize: 14, height: 1.6, color: Color(0xFF4B5563)),
+                    style: AppTheme.bodyLg,
                   ),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: AppTheme.spacingXL),
                 ],
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          border: const Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: viewModel.addingToCart
-                      ? null
-                      : () async {
-                          final error =
-                              await ref.read(productDetailProvider(slug).notifier).addToCart();
-                          if (!context.mounted) return;
-                          if (error == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Produk ditambahkan ke keranjang'),
-                                backgroundColor: Color(0xFF10B981),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(error),
-                                backgroundColor: const Color(0xFFEF4444),
-                              ),
-                            );
-                          }
-                        },
-                  icon: viewModel.addingToCart
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.add_shopping_cart, size: 20),
-                  label: const Text('Tambah ke Keranjang'),
+    );
+  }
+}
+
+class _ProductImage extends StatelessWidget {
+  final String? thumbnail;
+
+  const _ProductImage({required this.thumbnail});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final placeholder = isDark ? AppTheme.darkMuted : const Color(0xFFF3F4F6);
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return AspectRatio(
+      aspectRatio: 1,
+      child: thumbnail != null
+          ? CachedNetworkImage(
+              imageUrl: thumbnail!,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(color: placeholder),
+              errorWidget: (_, __, ___) => Container(
+                color: placeholder,
+                child: Center(
+                  child: AppIcon(AppIcons.imageOff, size: 48, color: muted),
                 ),
               ),
+            )
+          : Container(
+              color: placeholder,
+              child: Center(
+                child: AppIcon(AppIcons.image, size: 56, color: muted),
+              ),
             ),
-          ],
+    );
+  }
+}
+
+class _StatsRow extends StatelessWidget {
+  final ProductModel product;
+
+  const _StatsRow({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Wrap(
+      spacing: AppTheme.spacingLG,
+      runSpacing: AppTheme.spacingSM,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _Stat(
+          icon: AppIcons.tag,
+          label: 'Terjual ${product.totalSold}',
+          color: muted,
+        ),
+        _Stat(
+          icon: AppIcons.package,
+          label: 'Stok ${product.stock}',
+          color: product.stock <= 0 ? AppTheme.error : muted,
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color:
+                isDark ? AppTheme.darkIconBackground : AppTheme.iconBackground,
+            borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+          ),
+          child: Text(
+            product.condition.toLowerCase() == 'new' ? 'Baru' : 'Bekas',
+            style: AppTheme.labelSm.copyWith(
+              color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String icon;
+  final String label;
+  final Color color;
+
+  const _Stat({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppIcon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: AppTheme.bodySm.copyWith(color: color)),
+      ],
+    );
+  }
+}
+
+class _StoreRow extends StatelessWidget {
+  final StoreMini store;
+
+  const _StoreRow({required this.store});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingLG),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppTheme.darkIconBackground
+                  : AppTheme.iconBackground,
+              shape: BoxShape.circle,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: store.logo != null
+                ? CachedNetworkImage(
+                    imageUrl: store.logo!,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) =>
+                        _StoreInitial(name: store.name),
+                  )
+                : _StoreInitial(name: store.name),
+          ),
+          const SizedBox(width: AppTheme.spacingMD),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  store.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.titleMd,
+                ),
+                Text('Penjual', style: AppTheme.labelSm.copyWith(color: muted)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreInitial extends StatelessWidget {
+  final String name;
+
+  const _StoreInitial({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'S',
+        style: AppTheme.titleMd.copyWith(
+          color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _AddToCartBar extends StatelessWidget {
+  final bool isAdding;
+  final bool isOutOfStock;
+  final VoidCallback onAdd;
+
+  const _AddToCartBar({
+    required this.isAdding,
+    required this.isOutOfStock,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingLG),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : AppTheme.cardWhite,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppTheme.darkBorder : AppTheme.border,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: (isAdding || isOutOfStock) ? null : onAdd,
+            icon: isAdding
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const AppIcon(AppIcons.cart, size: AppIconSize.md),
+            label: Text(isOutOfStock ? 'Stok Habis' : 'Tambah ke Keranjang'),
+          ),
         ),
       ),
     );

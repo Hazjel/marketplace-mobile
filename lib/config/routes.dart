@@ -1,6 +1,9 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:blukios_marketplace/features/account/screens/account_screen.dart';
+import 'package:blukios_marketplace/features/account/screens/edit_profile_screen.dart';
+import 'package:blukios_marketplace/features/account/screens/settings_screen.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/screens/address_form_screen.dart';
 import 'package:blukios_marketplace/features/address/screens/address_list_screen.dart';
@@ -8,36 +11,50 @@ import 'package:blukios_marketplace/features/auth/screens/login_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/register_screen.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
+import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
+import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
 import 'package:blukios_marketplace/features/checkout/screens/checkout_screen.dart';
 import 'package:blukios_marketplace/features/checkout/screens/payment_webview_screen.dart';
 import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
-import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
-import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
-import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
+import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
+import 'package:blukios_marketplace/shared/widgets/app_shell.dart';
 
 class AppRoutes {
+  // Auth (outside the shell)
   static const String login = '/login';
   static const String register = '/register';
+
+  // Bottom-nav destinations
   static const String home = '/';
+  static const String categories = '/categories';
+  static const String transactions = '/transactions';
+  static const String wishlist = '/wishlist';
+  static const String account = '/account';
+
+  // Pushed over the shell — deliberately full-screen so a bottom bar
+  // can't invite mis-taps mid-checkout.
   static const String productDetail = '/product/:slug';
   static const String cart = '/cart';
-  static const String transactions = '/transactions';
   static const String checkout = '/checkout';
   static const String payment = '/payment/:transactionId';
   static const String addresses = '/addresses';
   static const String addressForm = '/addresses/form';
   static const String search = '/search';
-  static const String categories = '/categories';
-  static const String wishlist = '/wishlist';
+  static const String editProfile = '/account/edit';
+  static const String notificationSettings = '/account/notifications';
+  static const String privacySettings = '/account/privacy';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
 
+  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
   static GoRouter build(Ref ref) {
     return GoRouter(
+      navigatorKey: _rootNavigatorKey,
       initialLocation: home,
       refreshListenable: _AuthRefreshListenable(ref),
       redirect: (context, state) {
@@ -45,7 +62,8 @@ class AppRoutes {
         if (auth.state == AuthState.unknown) return null;
 
         final isAuthenticated = auth.state == AuthState.authenticated;
-        final isAuthRoute = state.matchedLocation == login || state.matchedLocation == register;
+        final isAuthRoute =
+            state.matchedLocation == login || state.matchedLocation == register;
 
         if (!isAuthenticated && !isAuthRoute) return login;
         if (isAuthenticated && isAuthRoute) return home;
@@ -55,40 +73,76 @@ class AppRoutes {
         return null;
       },
       routes: [
-        GoRoute(
-          path: login,
-          builder: (context, state) => const LoginScreen(),
+        GoRoute(path: login, builder: (_, __) => const LoginScreen()),
+        GoRoute(path: register, builder: (_, __) => const RegisterScreen()),
+
+        // Five-tab shell. `indexedStack` keeps each branch's navigation
+        // stack and scroll position alive across tab switches.
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) =>
+              AppShell(navigationShell: navigationShell),
+          branches: [
+            StatefulShellBranch(
+              routes: [GoRoute(path: home, builder: (_, __) => const HomeScreen())],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: categories,
+                  builder: (_, __) => const CategoryBrowseScreen(),
+                )
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: transactions,
+                  builder: (_, __) => const TransactionListScreen(),
+                )
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: wishlist,
+                  builder: (_, __) => const WishlistScreen(),
+                )
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: account,
+                  builder: (_, __) => const AccountScreen(),
+                )
+              ],
+            ),
+          ],
         ),
-        GoRoute(
-          path: register,
-          builder: (context, state) => const RegisterScreen(),
-        ),
-        GoRoute(
-          path: home,
-          builder: (context, state) => const HomeScreen(),
-        ),
+
+        // Full-screen pushes — parentNavigatorKey lifts them above the
+        // shell so the bottom bar is hidden.
         GoRoute(
           path: productDetail,
+          parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => ProductDetailScreen(
             slug: state.pathParameters['slug'] ?? '',
           ),
         ),
         GoRoute(
           path: cart,
-          builder: (context, state) => const CartScreen(),
-        ),
-        GoRoute(
-          path: transactions,
-          builder: (context, state) => const TransactionListScreen(),
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const CartScreen(),
         ),
         GoRoute(
           path: checkout,
-          builder: (context, state) => CheckoutScreen(
-            group: state.extra as CartGroupModel,
-          ),
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) =>
+              CheckoutScreen(group: state.extra as CartGroupModel),
         ),
         GoRoute(
           path: payment,
+          parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => PaymentWebviewScreen(
             transactionId: state.pathParameters['transactionId'] ?? '',
             snapToken: state.extra as String,
@@ -96,16 +150,18 @@ class AppRoutes {
         ),
         GoRoute(
           path: addresses,
-          builder: (context, state) => const AddressListScreen(),
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const AddressListScreen(),
         ),
         GoRoute(
           path: addressForm,
-          builder: (context, state) => AddressFormScreen(
-            existing: state.extra as AddressModel?,
-          ),
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) =>
+              AddressFormScreen(existing: state.extra as AddressModel?),
         ),
         GoRoute(
           path: search,
+          parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) {
             final extra = state.extra;
             final categoryArgs = extra is Map ? extra : const {};
@@ -117,12 +173,21 @@ class AppRoutes {
           },
         ),
         GoRoute(
-          path: categories,
-          builder: (context, state) => const CategoryBrowseScreen(),
+          path: editProfile,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const EditProfileScreen(),
         ),
         GoRoute(
-          path: wishlist,
-          builder: (context, state) => const WishlistScreen(),
+          path: notificationSettings,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) =>
+              const SettingsScreen(group: SettingsGroup.notification),
+        ),
+        GoRoute(
+          path: privacySettings,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) =>
+              const SettingsScreen(group: SettingsGroup.privacy),
         ),
       ],
     );

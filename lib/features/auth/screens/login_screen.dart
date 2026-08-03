@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
+import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/storage/secure_storage.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -126,10 +128,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Logo / Brand
-                  const Icon(
-                    Icons.storefront_rounded,
-                    size: 64,
-                    color: Color(0xFF2563EB),
+                  const AppIcon(
+                    AppIcons.store,
+                    size: 56,
+                    color: AppTheme.primary,
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -147,7 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -162,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 20),
+                          const AppIcon(AppIcons.alert, color: AppTheme.error, size: AppIconSize.md),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -193,16 +195,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Image.network(
-                              'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                              width: 20,
-                              height: 20,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.g_mobiledata,
-                                size: 24,
-                                color: Color(0xFF4285F4),
-                              ),
-                            ),
+                          : const BrandIcon(BrandAssets.google, size: 20),
                       label: const Text(
                         'Masuk dengan Google',
                         style: TextStyle(
@@ -223,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Text(
                           'atau',
                           style: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                             fontSize: 13,
                           ),
                         ),
@@ -240,7 +233,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       hintText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined),
+                      prefixIcon: FieldIcon(AppIcons.mail),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Email wajib diisi';
@@ -257,9 +250,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
                       hintText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      prefixIcon: const FieldIcon(AppIcons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        icon: AppIcon(_obscurePassword ? AppIcons.eyeOff : AppIcons.eye, size: AppIconSize.md),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
@@ -298,7 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text(
                         'Belum punya akun? ',
                         style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       GestureDetector(
