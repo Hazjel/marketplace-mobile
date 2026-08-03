@@ -8,11 +8,17 @@ class TransactionRepository {
 
   TransactionRepository(this._apiClient);
 
-  Future<List<TransactionModel>> getTransactions({int page = 1, String? status}) async {
+  Future<List<TransactionModel>> getTransactions({
+    int page = 1,
+    String? status,
+    int rowPerPage = 10,
+  }) async {
     final response = await _apiClient.get(
       ApiConfig.transactionsPaginated,
       queryParameters: {
         'page': page,
+        // Required by the API — omitting it returns a 422 "Validasi gagal".
+        'row_per_page': rowPerPage,
         if (status != null) 'status': status,
       },
     );
