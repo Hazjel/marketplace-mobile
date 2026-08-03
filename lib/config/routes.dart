@@ -13,11 +13,15 @@ import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
 import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
+import 'package:blukios_marketplace/features/chat/screens/chat_list_screen.dart';
+import 'package:blukios_marketplace/features/chat/screens/chat_thread_screen.dart';
+import 'package:blukios_marketplace/features/dashboard/screens/dashboard_screen.dart';
 import 'package:blukios_marketplace/features/checkout/screens/checkout_screen.dart';
 import 'package:blukios_marketplace/features/checkout/screens/payment_webview_screen.dart';
 import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
 import 'package:blukios_marketplace/shared/widgets/app_shell.dart';
@@ -46,9 +50,15 @@ class AppRoutes {
   static const String editProfile = '/account/edit';
   static const String notificationSettings = '/account/notifications';
   static const String privacySettings = '/account/privacy';
+  static const String storeDetail = '/store/:username';
+  static const String dashboard = '/account/dashboard';
+  static const String chatList = '/chat';
+  static const String chatThread = '/chat/:partnerId';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
+  static String storeDetailPath(String username) => '/store/$username';
+  static String chatThreadPath(String partnerId) => '/chat/$partnerId';
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -188,6 +198,32 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (_, __) =>
               const SettingsScreen(group: SettingsGroup.privacy),
+        ),
+        GoRoute(
+          path: dashboard,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const DashboardScreen(),
+        ),
+        GoRoute(
+          path: storeDetail,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => StoreDetailScreen(
+            username: state.pathParameters['username'] ?? '',
+          ),
+        ),
+        // Declared before /chat/:partnerId so the literal list route
+        // isn't swallowed by the parameterised one.
+        GoRoute(
+          path: chatList,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const ChatListScreen(),
+        ),
+        GoRoute(
+          path: chatThread,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => ChatThreadScreen(
+            partnerId: state.pathParameters['partnerId'] ?? '',
+          ),
         ),
       ],
     );

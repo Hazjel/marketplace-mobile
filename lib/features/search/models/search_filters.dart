@@ -4,6 +4,7 @@
 class SearchFilters {
   final String? search;
   final String? productCategoryId;
+  final String? storeId;
   final double? minPrice;
   final double? maxPrice;
   final String? condition;
@@ -17,6 +18,7 @@ class SearchFilters {
   const SearchFilters({
     this.search,
     this.productCategoryId,
+    this.storeId,
     this.minPrice,
     this.maxPrice,
     this.condition,
@@ -51,6 +53,7 @@ class SearchFilters {
       'stock_status': stockStatus ?? 'all',
       if (search != null && search!.isNotEmpty) 'search': search,
       if (productCategoryId != null) 'product_category_id': productCategoryId,
+      if (storeId != null) 'store_id': storeId,
       if (minPrice != null) 'min_price': minPrice,
       if (maxPrice != null) 'max_price': maxPrice,
       if (condition != null) 'condition': condition,
@@ -65,6 +68,7 @@ class SearchFilters {
   SearchFilters copyWith({
     String? search,
     String? productCategoryId,
+    String? storeId,
     double? minPrice,
     double? maxPrice,
     String? condition,
@@ -88,6 +92,7 @@ class SearchFilters {
     return SearchFilters(
       search: clearSearch ? null : (search ?? this.search),
       productCategoryId: clearCategory ? null : (productCategoryId ?? this.productCategoryId),
+      storeId: storeId ?? this.storeId,
       minPrice: clearMinPrice ? null : (minPrice ?? this.minPrice),
       maxPrice: clearMaxPrice ? null : (maxPrice ?? this.maxPrice),
       condition: clearCondition ? null : (condition ?? this.condition),

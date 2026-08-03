@@ -51,8 +51,11 @@ class ApiConfig {
 
   // Store detail & follow (3d)
   static String storeByUsername(String username) => '/store/username/$username';
-  static String storeCategories(String id) => '/store/$id/categories';
-  static String storeReviews(String id) => '/store/$id/reviews';
+  // Categories and reviews are keyed by username, not store id.
+  static String storeCategories(String username) =>
+      '/store/username/$username/categories';
+  static String storeReviews(String username) =>
+      '/store/username/$username/reviews';
   static String storeFollow(String id) => '/store/$id/follow';
   static String storeUnfollow(String id) => '/store/$id/unfollow';
   static String storeFollowStatus(String id) => '/store/$id/follow-status';
@@ -74,5 +77,17 @@ class ApiConfig {
   static String chatMessages(String userId) => '/chat/$userId';
   static const String chatSend = '/chat/send';
   static String chatUser(String id) => '/chat/user/$id';
+  // Note the /api prefix — Broadcast::routes() is registered inside
+  // routes/api.php, not at the framework default /broadcasting/auth.
   static const String broadcastAuth = '/broadcasting/auth';
+  static String get broadcastAuthUrl => '$baseUrl$broadcastAuth';
+
+  // ── Reverb (WebSocket) ────────────────────────────────────────────
+  // Values mirror docker-compose.yml. nginx proxies /app to the reverb
+  // container, so the client connects on the normal web port rather
+  // than 8080 directly.
+  static const String reverbAppKey = 'reverbkey';
+  static String get reverbHost => Uri.parse(baseUrl).host;
+  static bool get reverbUseTLS => Uri.parse(baseUrl).scheme == 'https';
+  static int get reverbPort => reverbUseTLS ? 443 : 80;
 }

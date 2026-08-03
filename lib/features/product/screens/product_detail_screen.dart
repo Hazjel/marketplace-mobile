@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
+import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
+import 'package:blukios_marketplace/features/review/models/review_model.dart';
 import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
 import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
@@ -125,6 +128,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     product.description ?? 'Tidak ada deskripsi',
                     style: AppTheme.bodyLg,
                   ),
+                  if (product.reviews.isNotEmpty) ...[
+                    const SizedBox(height: AppTheme.spacingXL),
+                    const Divider(height: 1),
+                    const SizedBox(height: AppTheme.spacingLG),
+                    _ReviewSection(product: product),
+                  ],
                   const SizedBox(height: AppTheme.spacingXL),
                 ],
               ),
@@ -246,9 +255,15 @@ class _StoreRow extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingLG),
-      child: Row(
+    return InkWell(
+      // Only navigable when the API included the username — older list
+      // payloads omit it.
+      onTap: store.username == null
+          ? null
+          : () => context.push(AppRoutes.storeDetailPath(store.username!)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingLG),
+        child: Row(
         children: [
           Container(
             width: 40,
@@ -281,12 +296,154 @@ class _StoreRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTheme.titleMd,
                 ),
-                Text('Penjual', style: AppTheme.labelSm.copyWith(color: muted)),
+                Text(
+                  store.username == null ? 'Penjual' : 'Lihat Toko',
+                  style: AppTheme.labelSm.copyWith(
+                    color: store.username == null ? muted : AppTheme.primary,
+                  ),
+                ),
               ],
             ),
           ),
+          if (store.username != null)
+            AppIcon(AppIcons.chevronRight,
+                size: AppIconSize.md, color: muted),
         ],
+        ),
       ),
+    );
+  }
+}
+
+class _ReviewSection extends StatelessWidget {
+  final ProductModel product;
+
+  const _ReviewSection({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final average = product.averageRating;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Ulasan', style: AppTheme.titleMd),
+            const SizedBox(width: AppTheme.spacingSM),
+            if (average != null) ...[
+              const AppIcon(
+                AppIcons.starFilled,
+                size: AppIconSize.sm,
+                color: AppTheme.warning,
+              ),
+              const SizedBox(width: 3),
+              Text(average.toStringAsFixed(1), style: AppTheme.titleSm),
+            ],
+            const Spacer(),
+            Text(
+              '${product.reviews.length} ulasan',
+              style: AppTheme.labelSm.copyWith(color: muted),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spacingMD),
+        // Only the first few — the full list lives on its own screen once
+        // there are enough reviews to warrant one.
+        ...product.reviews.take(3).map(
+              (review) => Padding(
+                padding: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+                child: _ReviewTile(review: review),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  final ReviewModel review;
+
+  const _ReviewTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Row(
+              children: List.generate(
+                5,
+                (i) => AppIcon(
+                  i < review.rating ? AppIcons.starFilled : AppIcons.star,
+                  size: 12,
+                  color: i < review.rating ? AppTheme.warning : muted,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacingSM),
+            Flexible(
+              child: Text(
+                review.userName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTheme.labelSm.copyWith(color: muted),
+              ),
+            ),
+          ],
+        ),
+        if (review.review?.isNotEmpty == true) ...[
+          const SizedBox(height: 4),
+          Text(review.review!, style: AppTheme.bodySm),
+        ],
+        if (review.attachments.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.spacingSM),
+          SizedBox(
+            height: 56,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: review.attachments.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                final attachment = review.attachments[index];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: attachment.isVideo
+                        ? Container(
+                            color: isDark
+                                ? AppTheme.darkMuted
+                                : const Color(0xFFF3F4F6),
+                            child: Center(
+                              child: AppIcon(AppIcons.image,
+                                  size: AppIconSize.md, color: muted),
+                            ),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: attachment.filePath,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              color: isDark
+                                  ? AppTheme.darkMuted
+                                  : const Color(0xFFF3F4F6),
+                            ),
+                          ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

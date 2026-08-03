@@ -74,6 +74,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 onTap: () => context.go(AppRoutes.transactions),
               ),
               _MenuTile(
+                icon: AppIcons.wallet,
+                label: 'Ringkasan Belanja',
+                onTap: () => context.push(AppRoutes.dashboard),
+              ),
+              _MenuTile(
+                icon: AppIcons.inbox,
+                label: 'Chat',
+                onTap: () => context.push(AppRoutes.chatList),
+              ),
+              _MenuTile(
                 icon: AppIcons.heart,
                 label: 'Wishlist',
                 onTap: () => context.go(AppRoutes.wishlist),

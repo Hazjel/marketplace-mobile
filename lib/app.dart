@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/features/chat/viewmodels/chat_viewmodel.dart';
 import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
 
 class BlukiosApp extends ConsumerStatefulWidget {
@@ -36,6 +37,10 @@ class _BlukiosAppState extends ConsumerState<BlukiosApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Keeps the chat websocket alive for the app's lifetime; it connects
+    // and tears itself down as auth state changes.
+    ref.watch(chatRealtimeProvider);
+
     return MaterialApp.router(
       title: 'Blukios Marketplace',
       debugShowCheckedModeBanner: false,
