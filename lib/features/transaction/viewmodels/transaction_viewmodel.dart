@@ -70,6 +70,25 @@ class TransactionNotifier extends Notifier<TransactionData> {
       }).toList(),
     );
   }
+
+  /// Buyer confirms receipt of a `delivering` order with a photo proof.
+  /// Releases escrow to the store server-side. Returns null on success, or
+  /// an error message.
+  Future<String?> completeOrder(String id, String receivingProofPath) async {
+    try {
+      final updated = await ref.read(transactionRepositoryProvider).completeOrder(
+            id: id,
+            receivingProofPath: receivingProofPath,
+          );
+      state = state.copyWith(
+        transactions:
+            state.transactions.map((t) => t.id == id ? updated : t).toList(),
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
 }
 
 final transactionProvider =

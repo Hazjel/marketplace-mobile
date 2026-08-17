@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
@@ -53,6 +54,42 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
     }
   }
 
+  Future<void> _completeOrder(TransactionModel trx) async {
+    final picker = ImagePicker();
+    final photo = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (photo == null) return;
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Konfirmasi Pesanan Diterima'),
+        content: const Text(
+          'Pastikan barang sudah diterima dalam kondisi baik. Dana akan diteruskan ke penjual setelah ini.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Konfirmasi')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    final error =
+        await ref.read(transactionProvider.notifier).completeOrder(trx.id, photo.path);
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: AppTheme.error),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pesanan selesai — dana diteruskan ke penjual')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = ref.watch(transactionProvider);
@@ -85,6 +122,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                           trx: viewModel.transactions[index],
                           onCheckStatus: _refreshStatus,
                           onReview: (item) => _reviewItem(viewModel.transactions[index], item),
+                          onCompleteOrder: () => _completeOrder(viewModel.transactions[index]),
                         ),
                       ),
                     ),
@@ -96,11 +134,13 @@ class _TransactionCard extends StatelessWidget {
   final TransactionModel trx;
   final Future<void> Function(TransactionModel) onCheckStatus;
   final Future<void> Function(TransactionDetailModel) onReview;
+  final VoidCallback onCompleteOrder;
 
   const _TransactionCard({
     required this.trx,
     required this.onCheckStatus,
     required this.onReview,
+    required this.onCompleteOrder,
   });
 
   @override
@@ -136,6 +176,13 @@ class _TransactionCard extends StatelessWidget {
                 status: trx.paymentStatus,
                 label: trx.paymentStatusLabel,
               ),
+              if (trx.paymentStatus == 'paid') ...[
+                const SizedBox(width: 6),
+                _StatusBadge(
+                  status: trx.deliveryStatus,
+                  label: trx.deliveryStatusLabel,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppTheme.spacingSM),
@@ -191,6 +238,17 @@ class _TransactionCard extends StatelessWidget {
               ),
             ),
           ],
+          if (trx.deliveryStatus == 'delivering') ...[
+            const SizedBox(height: AppTheme.spacingMD),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onCompleteOrder,
+                icon: const AppIcon(AppIcons.check, size: AppIconSize.sm, color: Colors.white),
+                label: const Text('Konfirmasi Pesanan Diterima'),
+              ),
+            ),
+          ],
           if (trx.deliveryStatus == 'completed') ...[
             for (final item in trx.transactionDetails)
               if (!trx.reviewedProductIds.contains(item.productId)) ...[
@@ -223,10 +281,14 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = switch (status) {
-      'paid' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
+      'paid' || 'completed' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
       'failed' || 'cancelled' || 'expired' => (
           const Color(0xFFFEE2E2),
           const Color(0xFFDC2626),
+        ),
+      'delivering' || 'processing' => (
+          const Color(0xFFDBEAFE),
+          const Color(0xFF2563EB),
         ),
       _ => (const Color(0xFFFEF9C3), const Color(0xFFCA8A04)),
     };

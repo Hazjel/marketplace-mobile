@@ -123,4 +123,21 @@ class TransactionRepository {
 
     return TransactionModel.fromJson(response.data['data']);
   }
+
+  /// Buyer confirms receipt of a `delivering` order — `POST
+  /// /transaction/{id}/complete`. Requires a photo proof of receipt
+  /// (`receiving_proof`, required|image|max:2048 server-side) and releases
+  /// the store's escrowed balance on success. See [updateDeliveryStatus]'s
+  /// doc comment for why this is a separate endpoint from the seller's
+  /// status update.
+  Future<TransactionModel> completeOrder({
+    required String id,
+    required String receivingProofPath,
+  }) async {
+    final data = FormData.fromMap({
+      'receiving_proof': await MultipartFile.fromFile(receivingProofPath),
+    });
+    final response = await _apiClient.post('${ApiConfig.transactions}/$id/complete', data: data);
+    return TransactionModel.fromJson(response.data['data']);
+  }
 }
