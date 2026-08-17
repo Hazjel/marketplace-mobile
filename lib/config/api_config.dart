@@ -1,9 +1,14 @@
 class ApiConfig {
-  // Production API — blukios.store, served through nginx.
-  static const String baseUrl = 'https://blukios.store/api';
-  // static const String baseUrl = 'http://10.0.2.2/api'; // local backend, Android emulator
-  // static const String baseUrl = 'http://localhost/api'; // local backend, iOS simulator
-  
+  // Production API — blukios.store, served through nginx. Overridable at
+  // build/run time without touching source, e.g. to point a debug build at
+  // the testing server:
+  //   flutter run --dart-define=API_BASE_URL=http://100.77.244.19:8888/api
+  // No flag means production — this default is deliberate, not a placeholder.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://blukios.store/api',
+  );
+
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 

@@ -47,18 +47,23 @@ flutter pub get
 
 ### 3. Konfigurasi API
 
-Edit `lib/config/api_config.dart`:
+Default (tanpa flag apa pun) selalu mengarah ke production (`https://blukios.store/api`) — ini disengaja, bukan placeholder. Untuk mengarahkan build ke backend lain tanpa mengedit source, pakai `--dart-define`:
 
-```dart
-// Untuk Android Emulator:
-static const String baseUrl = 'http://10.0.2.2:8000/api';
+```bash
+# Server testing (Tailscale)
+flutter run --dart-define=API_BASE_URL=http://100.77.244.19:8888/api
 
-// Untuk iOS Simulator:
-static const String baseUrl = 'http://localhost:8000/api';
+# Android Emulator ke backend lokal
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2/api
 
-// Untuk device fisik (gunakan IP lokal):
-static const String baseUrl = 'http://192.168.x.x:8000/api';
+# iOS Simulator ke backend lokal
+flutter run --dart-define=API_BASE_URL=http://localhost/api
+
+# Device fisik (gunakan IP lokal mesin dev)
+flutter run --dart-define=API_BASE_URL=http://192.168.x.x/api
 ```
+
+`--dart-define` juga berlaku untuk `flutter build apk`/`build appbundle`/`build ios`.
 
 ### 4. Jalankan Aplikasi
 

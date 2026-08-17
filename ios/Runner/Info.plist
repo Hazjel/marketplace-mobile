@@ -30,7 +30,7 @@
 				<string>mobileblue</string>
 			</array>
 			<key>CFBundleURLName</key>
-			<string>com.example.blukiosMarketplace</string>
+			<string>com.blukios.marketplace</string>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
