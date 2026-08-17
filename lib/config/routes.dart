@@ -21,6 +21,9 @@ import 'package:blukios_marketplace/features/checkout/screens/payment_webview_sc
 import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/seller/product/models/seller_product_model.dart';
+import 'package:blukios_marketplace/features/seller/product/screens/seller_product_form_screen.dart';
+import 'package:blukios_marketplace/features/seller/product/screens/seller_product_list_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
@@ -54,6 +57,11 @@ class AppRoutes {
   static const String dashboard = '/account/dashboard';
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
+
+  // Seller Centre — product management. Not yet wired into any nav shell
+  // or role gating; pushed directly until seller-mode navigation lands.
+  static const String sellerProducts = '/seller/products';
+  static const String sellerProductForm = '/seller/products/form';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -223,6 +231,18 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => ChatThreadScreen(
             partnerId: state.pathParameters['partnerId'] ?? '',
+          ),
+        ),
+        GoRoute(
+          path: sellerProducts,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerProductListScreen(),
+        ),
+        GoRoute(
+          path: sellerProductForm,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => SellerProductFormScreen(
+            existing: state.extra as SellerProductModel?,
           ),
         ),
       ],
