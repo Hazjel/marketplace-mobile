@@ -98,7 +98,15 @@ class ApiConfig {
   static int get reverbPort => reverbUseTLS ? 443 : 80;
 
   // Seller store management — registration + own-store profile editing.
+  // (`myStore` is already declared above under "Seller product management".)
   static const String registerStore = '/register-store';
-  static const String myStore = '/my-store';
   static String storeById(String id) => '/store/$id';
+
+  // Seller dashboard & wallet
+  static const String sellerDashboard = '/seller/dashboard/summary';
+  static const String myStoreBalance = '/my-store-balance';
+  static const String storeBalanceHistoryPaginated =
+      '/store-balance-history/all/paginated';
+  static const String withdrawal = '/withdrawal';
+  static const String withdrawalPaginated = '/withdrawal/all/paginated';
 }

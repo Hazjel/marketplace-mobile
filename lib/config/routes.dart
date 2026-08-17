@@ -22,6 +22,7 @@ import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/review/screens/review_form_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/seller/dashboard/screens/seller_dashboard_screen.dart';
 import 'package:blukios_marketplace/features/seller/orders/screens/seller_order_detail_screen.dart';
 import 'package:blukios_marketplace/features/seller/orders/screens/seller_order_list_screen.dart';
 import 'package:blukios_marketplace/features/seller/product/models/seller_product_model.dart';
@@ -29,6 +30,9 @@ import 'package:blukios_marketplace/features/seller/product/screens/seller_produ
 import 'package:blukios_marketplace/features/seller/product/screens/seller_product_list_screen.dart';
 import 'package:blukios_marketplace/features/seller/store/screens/seller_onboarding_screen.dart';
 import 'package:blukios_marketplace/features/seller/store/screens/seller_store_profile_screen.dart';
+import 'package:blukios_marketplace/features/seller/wallet/models/seller_wallet_model.dart';
+import 'package:blukios_marketplace/features/seller/wallet/screens/seller_wallet_screen.dart';
+import 'package:blukios_marketplace/features/seller/wallet/screens/withdrawal_form_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
@@ -80,6 +84,12 @@ class AppRoutes {
   // landed. Reachable today only by pushing these paths directly.
   static const String sellerOrders = '/seller/orders';
   static const String sellerOrderDetail = '/seller/orders/:id';
+
+  // Seller centre — not yet wired into a nav shell. Another pass adds
+  // seller-mode navigation entry once all seller features have landed.
+  static const String sellerDashboard = '/seller/dashboard';
+  static const String sellerWallet = '/seller/wallet';
+  static const String sellerWalletWithdraw = '/seller/wallet/withdraw';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -303,6 +313,25 @@ class AppRoutes {
           builder: (context, state) => SellerOrderDetailScreen(
             orderId: state.pathParameters['id'] ?? '',
           ),
+        ),
+
+        // Seller centre — full-screen pushes, same as the rest above.
+        // Not linked from anywhere yet (see the route constants' note).
+        GoRoute(
+          path: sellerDashboard,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerDashboardScreen(),
+        ),
+        GoRoute(
+          path: sellerWallet,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerWalletScreen(),
+        ),
+        GoRoute(
+          path: sellerWalletWithdraw,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) =>
+              WithdrawalFormScreen(balance: state.extra as StoreBalanceModel),
         ),
       ],
     );
