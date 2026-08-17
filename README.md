@@ -96,6 +96,14 @@ Semua endpoint mengacu ke Laravel API (`api-blue/`):
 - **Border Radius**: 12-16px
 - **Material 3** enabled
 
+## Crash Reporting & Analytics
+
+Firebase Crashlytics + Analytics sudah di-wire di kode (`lib/core/monitoring/analytics_service.dart`, diinisialisasi di `lib/main.dart`), tapi **belum diprovisioning** — belum ada project Firebase asli, jadi `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) belum ada. Tanpa file itu, `Firebase.initializeApp()` gagal secara aman (di-try/catch) dan app tetap jalan normal, cuma crash reporting/analytics diam saja (no-op).
+
+Untuk mengaktifkan:
+1. Jalankan `flutterfire configure` (butuh akun Google + login interaktif di browser — tidak bisa dilakukan dari sesi otomatis) — akan generate kedua file config di atas dan mendaftarkan app ini ke project Firebase.
+2. Setelah file config ada, tidak perlu ubah kode apa pun — `android/app/build.gradle.kts` sudah otomatis apply plugin Google Services begitu `google-services.json` terdeteksi.
+
 ## Fitur
 
 - [x] Autentikasi (Login / Register) via Laravel Sanctum

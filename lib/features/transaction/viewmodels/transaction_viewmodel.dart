@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
@@ -84,6 +85,7 @@ class TransactionNotifier extends Notifier<TransactionData> {
         transactions:
             state.transactions.map((t) => t.id == id ? updated : t).toList(),
       );
+      AnalyticsService.logEvent('order_completed', parameters: {'transaction_id': id});
       return null;
     } catch (e) {
       return e.toString();

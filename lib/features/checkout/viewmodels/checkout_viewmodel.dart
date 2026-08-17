@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
@@ -197,6 +198,11 @@ class CheckoutNotifier
                     .toList(),
               );
       state = state.copyWith(isSubmitting: false);
+      AnalyticsService.logEvent('checkout_submitted', parameters: {
+        'value': state.grandTotal,
+        'currency': 'IDR',
+        'store_id': state.group.storeId,
+      });
       return transaction;
     } catch (e) {
       state = state.copyWith(isSubmitting: false, submitError: e.toString());

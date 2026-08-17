@@ -41,3 +41,12 @@ android {
 flutter {
     source = "../.."
 }
+
+// Applied only if the Firebase config file actually exists — the plugin
+// itself hard-fails the build otherwise ("File google-services.json is
+// missing"). Firebase isn't provisioned yet (see README.md); once
+// google-services.json is added here, this activates automatically with
+// no further gradle changes needed.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}

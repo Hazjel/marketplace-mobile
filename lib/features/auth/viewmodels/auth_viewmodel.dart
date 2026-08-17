@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/core/storage/secure_storage.dart';
@@ -78,6 +79,7 @@ class AuthNotifier extends Notifier<AuthData> {
         currentUser: user,
         isLoading: false,
       );
+      AnalyticsService.logEvent('login', parameters: {'method': 'email'});
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
@@ -113,6 +115,7 @@ class AuthNotifier extends Notifier<AuthData> {
         currentUser: user,
         isLoading: false,
       );
+      AnalyticsService.logEvent('sign_up', parameters: {'method': 'email', 'role': role});
       return true;
     } on ApiException catch (e) {
       String errorMsg = e.message;
