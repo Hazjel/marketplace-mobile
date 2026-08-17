@@ -90,4 +90,12 @@ class ApiConfig {
   static String get reverbHost => Uri.parse(baseUrl).host;
   static bool get reverbUseTLS => Uri.parse(baseUrl).scheme == 'https';
   static int get reverbPort => reverbUseTLS ? 443 : 80;
+
+  // Seller dashboard & wallet
+  static const String sellerDashboard = '/seller/dashboard/summary';
+  static const String myStoreBalance = '/my-store-balance';
+  static const String storeBalanceHistoryPaginated =
+      '/store-balance-history/all/paginated';
+  static const String withdrawal = '/withdrawal';
+  static const String withdrawalPaginated = '/withdrawal/all/paginated';
 }
