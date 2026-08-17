@@ -90,4 +90,9 @@ class ApiConfig {
   static String get reverbHost => Uri.parse(baseUrl).host;
   static bool get reverbUseTLS => Uri.parse(baseUrl).scheme == 'https';
   static int get reverbPort => reverbUseTLS ? 443 : 80;
+
+  // Seller store management — registration + own-store profile editing.
+  static const String registerStore = '/register-store';
+  static const String myStore = '/my-store';
+  static String storeById(String id) => '/store/$id';
 }

@@ -22,6 +22,8 @@ import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/review/screens/review_form_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/seller/store/screens/seller_onboarding_screen.dart';
+import 'package:blukios_marketplace/features/seller/store/screens/seller_store_profile_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
@@ -56,6 +58,12 @@ class AppRoutes {
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
   static const String reviewForm = '/review/:transactionId/:productId';
+
+  // Seller store management — reachable by path only for now; bottom-nav
+  // wiring and role-gating land in a later pass (see redirect callback
+  // below).
+  static const String sellerOnboarding = '/seller/onboarding';
+  static const String sellerStoreProfile = '/seller/store';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -242,6 +250,16 @@ class AppRoutes {
               productThumbnail: args['productThumbnail'] as String?,
             );
           },
+        ),
+        GoRoute(
+          path: sellerOnboarding,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerOnboardingScreen(),
+        ),
+        GoRoute(
+          path: sellerStoreProfile,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerStoreProfileScreen(),
         ),
       ],
     );

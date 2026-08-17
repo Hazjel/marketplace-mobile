@@ -46,3 +46,4 @@ app.*.map.json
 /android/app/build/
 /android/app/.gradle/
 /android/build/
+.claude/worktrees/
