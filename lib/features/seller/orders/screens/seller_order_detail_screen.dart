@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
@@ -31,6 +35,7 @@ class _SellerOrderDetailScreenState
     extends ConsumerState<SellerOrderDetailScreen> {
   final _trackingController = TextEditingController();
   bool _trackingSynced = false;
+  XFile? _pickedProof;
 
   @override
   void initState() {
@@ -46,6 +51,12 @@ class _SellerOrderDetailScreenState
     super.dispose();
   }
 
+  Future<void> _pickProof() async {
+    final photo = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (photo == null) return;
+    setState(() => _pickedProof = photo);
+  }
+
   Future<void> _updateStatus(String deliveryStatus) async {
     final notifier =
         ref.read(sellerOrderDetailProvider(widget.orderId).notifier);
@@ -54,10 +65,12 @@ class _SellerOrderDetailScreenState
       trackingNumber: _trackingController.text.trim().isEmpty
           ? null
           : _trackingController.text.trim(),
+      deliveryProofPath: _pickedProof?.path,
     );
     if (!mounted) return;
 
     if (success) {
+      setState(() => _pickedProof = null);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Status pesanan berhasil diperbarui')),
       );
@@ -244,6 +257,62 @@ class _SellerOrderDetailScreenState
                                         hintText: 'Masukkan nomor resi pengiriman',
                                       ),
                                     ),
+                                    // Proof photo is only offered while `processing` — it's
+                                    // attached when marking the order as shipped, mirroring
+                                    // the web seller centre's flow.
+                                    if (order.deliveryStatus == 'processing') ...[
+                                      const SizedBox(height: AppTheme.spacingMD),
+                                      Text('Bukti Pengiriman (opsional)', style: AppTheme.labelMd),
+                                      const SizedBox(height: AppTheme.spacingSM),
+                                      GestureDetector(
+                                        onTap: _pickProof,
+                                        child: Container(
+                                          height: 120,
+                                          width: 120,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(AppTheme.radiusLG),
+                                            border: Border.all(
+                                              color: isDark ? AppTheme.darkBorder : AppTheme.border,
+                                            ),
+                                          ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: _pickedProof != null
+                                              ? Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    Image.file(File(_pickedProof!.path), fit: BoxFit.cover),
+                                                    Positioned(
+                                                      top: 4,
+                                                      right: 4,
+                                                      child: GestureDetector(
+                                                        onTap: () => setState(() => _pickedProof = null),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.all(2),
+                                                          decoration: const BoxDecoration(
+                                                            color: Colors.black54,
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const AppIcon(
+                                                            AppIcons.close,
+                                                            size: AppIconSize.sm,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              : order.deliveryProof != null
+                                                  ? CachedNetworkImage(
+                                                      imageUrl: order.deliveryProof!,
+                                                      fit: BoxFit.cover,
+                                                      errorWidget: (_, __, ___) =>
+                                                          _ProofPlaceholder(muted: muted),
+                                                    )
+                                                  : _ProofPlaceholder(muted: muted),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: AppTheme.spacingMD),
                                     // Only `processing` and `delivering` are offered — see
                                     // the class doc comment for why `completed` is excluded.
@@ -286,6 +355,26 @@ class _SellerOrderDetailScreenState
                           ],
                         ),
                       ),
+      ),
+    );
+  }
+}
+
+class _ProofPlaceholder extends StatelessWidget {
+  final Color muted;
+
+  const _ProofPlaceholder({required this.muted});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon(AppIcons.image, size: AppIconSize.lg, color: muted),
+          const SizedBox(height: 4),
+          Text('Tambah Foto', style: AppTheme.labelSm.copyWith(color: muted)),
+        ],
       ),
     );
   }
