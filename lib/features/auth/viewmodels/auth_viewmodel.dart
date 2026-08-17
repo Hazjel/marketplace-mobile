@@ -50,9 +50,21 @@ class AuthNotifier extends Notifier<AuthData> {
     try {
       final user = await ref.read(authRepositoryProvider).getProfile();
       state = state.copyWith(state: AuthState.authenticated, currentUser: user);
+    } on ApiException catch (e) {
+      // Only a real auth rejection (invalid/expired/revoked token) should
+      // sign the user out. A network blip, timeout, or server hiccup on
+      // startup must NOT wipe an otherwise-valid saved session — that was
+      // forcing a full re-login on every flaky connection. Stay
+      // `unknown` so the router holds its redirect decision instead of
+      // bouncing to /login; the next successful check (retry, next
+      // launch, or a real API call's own 401) resolves it properly.
+      if (e.statusCode == 401) {
+        await SecureStorage.clearAll();
+        state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
+      }
     } catch (_) {
-      await SecureStorage.clearAll();
-      state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
+      // Non-API exception (e.g. JSON parsing) — same "don't destroy a
+      // possibly-valid session over a transient failure" reasoning.
     }
   }
 

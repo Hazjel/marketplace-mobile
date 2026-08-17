@@ -55,6 +55,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted =
         isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final isSeller = ref.watch(authProvider).currentUser?.role == 'store';
 
     return AppScaffold(
       title: 'Akun',
@@ -63,6 +64,49 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         padding: const EdgeInsets.only(bottom: AppTheme.spacingXL),
         children: [
           _ProfileCard(state: state, muted: muted),
+          const SizedBox(height: AppTheme.spacingSM),
+
+          isSeller
+              ? _MenuSection(
+                  title: 'Toko Saya',
+                  children: [
+                    _MenuTile(
+                      icon: AppIcons.layers,
+                      label: 'Dashboard Toko',
+                      onTap: () => context.push(AppRoutes.sellerDashboard),
+                    ),
+                    _MenuTile(
+                      icon: AppIcons.store,
+                      label: 'Profil Toko',
+                      onTap: () => context.push(AppRoutes.sellerStoreProfile),
+                    ),
+                    _MenuTile(
+                      icon: AppIcons.package,
+                      label: 'Kelola Produk',
+                      onTap: () => context.push(AppRoutes.sellerProducts),
+                    ),
+                    _MenuTile(
+                      icon: AppIcons.truck,
+                      label: 'Pesanan Masuk',
+                      onTap: () => context.push(AppRoutes.sellerOrders),
+                    ),
+                    _MenuTile(
+                      icon: AppIcons.wallet,
+                      label: 'Dompet Toko',
+                      onTap: () => context.push(AppRoutes.sellerWallet),
+                    ),
+                  ],
+                )
+              : _MenuSection(
+                  title: 'Jualan',
+                  children: [
+                    _MenuTile(
+                      icon: AppIcons.store,
+                      label: 'Buka Toko',
+                      onTap: () => context.push(AppRoutes.sellerOnboarding),
+                    ),
+                  ],
+                ),
           const SizedBox(height: AppTheme.spacingSM),
 
           _MenuSection(

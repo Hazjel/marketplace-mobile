@@ -68,25 +68,16 @@ class AppRoutes {
   static const String chatThread = '/chat/:partnerId';
   static const String reviewForm = '/review/:transactionId/:productId';
 
-  // Seller store management — reachable by path only for now; bottom-nav
-  // wiring and role-gating land in a later pass (see redirect callback
-  // below).
+  // Seller Centre — full-screen pushes from the "Toko Saya"/"Jualan"
+  // section on AccountScreen, gated by role in the redirect callback below.
+  // Deliberately not a bottom-nav tab: a buyer can also be a seller, so
+  // switching "modes" is a deliberate navigation, not a persistent tab.
   static const String sellerOnboarding = '/seller/onboarding';
   static const String sellerStoreProfile = '/seller/store';
-
-  // Seller Centre — product management. Not yet wired into any nav shell
-  // or role gating; pushed directly until seller-mode navigation lands.
   static const String sellerProducts = '/seller/products';
   static const String sellerProductForm = '/seller/products/form';
-
-  // Seller order management. Not linked from the bottom-nav shell yet —
-  // seller-mode navigation entry is wired up once every seller feature has
-  // landed. Reachable today only by pushing these paths directly.
   static const String sellerOrders = '/seller/orders';
   static const String sellerOrderDetail = '/seller/orders/:id';
-
-  // Seller centre — not yet wired into a nav shell. Another pass adds
-  // seller-mode navigation entry once all seller features have landed.
   static const String sellerDashboard = '/seller/dashboard';
   static const String sellerWallet = '/seller/wallet';
   static const String sellerWalletWithdraw = '/seller/wallet/withdraw';
@@ -117,8 +108,17 @@ class AppRoutes {
         if (!isAuthenticated && !isAuthRoute) return login;
         if (isAuthenticated && isAuthRoute) return home;
 
-        // Seller routes are not part of the buyer build yet. When
-        // lib/features/seller/ lands, gate it here on auth.currentUser?.role.
+        // Seller Centre: onboarding is for buyers becoming a seller, every
+        // other /seller/* route needs an existing store. Cross-navigating
+        // either way bounces to the right one instead of erroring.
+        final isSellerRoute = state.matchedLocation.startsWith('/seller/');
+        final isSeller = auth.currentUser?.role == 'store';
+        if (isSellerRoute) {
+          final isOnboarding = state.matchedLocation == sellerOnboarding;
+          if (isOnboarding && isSeller) return sellerStoreProfile;
+          if (!isOnboarding && !isSeller) return sellerOnboarding;
+        }
+
         return null;
       },
       routes: [
