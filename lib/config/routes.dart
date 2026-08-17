@@ -21,6 +21,8 @@ import 'package:blukios_marketplace/features/checkout/screens/payment_webview_sc
 import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
+import 'package:blukios_marketplace/features/seller/orders/screens/seller_order_detail_screen.dart';
+import 'package:blukios_marketplace/features/seller/orders/screens/seller_order_list_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
@@ -55,10 +57,17 @@ class AppRoutes {
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
 
+  // Seller order management. Not linked from the bottom-nav shell yet —
+  // seller-mode navigation entry is wired up once every seller feature has
+  // landed. Reachable today only by pushing these paths directly.
+  static const String sellerOrders = '/seller/orders';
+  static const String sellerOrderDetail = '/seller/orders/:id';
+
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
   static String storeDetailPath(String username) => '/store/$username';
   static String chatThreadPath(String partnerId) => '/chat/$partnerId';
+  static String sellerOrderDetailPath(String id) => '/seller/orders/$id';
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -223,6 +232,20 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => ChatThreadScreen(
             partnerId: state.pathParameters['partnerId'] ?? '',
+          ),
+        ),
+        // Seller order management — see the constants above for why these
+        // aren't part of the bottom-nav shell yet.
+        GoRoute(
+          path: sellerOrders,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerOrderListScreen(),
+        ),
+        GoRoute(
+          path: sellerOrderDetail,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => SellerOrderDetailScreen(
+            orderId: state.pathParameters['id'] ?? '',
           ),
         ),
       ],
