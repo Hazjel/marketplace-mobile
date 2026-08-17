@@ -47,3 +47,9 @@ app.*.map.json
 /android/app/.gradle/
 /android/build/
 .claude/worktrees/
+
+# Release signing — never commit the keystore or its passwords.
+/android/key.properties
+*.jks
+*.keystore
+.vscode/
