@@ -5,6 +5,7 @@ import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
 import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
 import 'package:blukios_marketplace/features/home/data/product_repository.dart';
 import 'package:blukios_marketplace/features/review/data/review_repository.dart';
+import 'package:blukios_marketplace/features/seller/product/data/seller_product_repository.dart';
 import 'package:blukios_marketplace/features/seller/store/data/seller_store_repository.dart';
 import 'package:blukios_marketplace/features/shipment/data/shipment_repository.dart';
 import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
@@ -47,4 +48,8 @@ final reviewRepositoryProvider = Provider<ReviewRepository>(
 
 final sellerStoreRepositoryProvider = Provider<SellerStoreRepository>(
   (ref) => SellerStoreRepository(ref.watch(apiClientProvider)),
+);
+
+final sellerProductRepositoryProvider = Provider<SellerProductRepository>(
+  (ref) => SellerProductRepository(ref.watch(apiClientProvider)),
 );

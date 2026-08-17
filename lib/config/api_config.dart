@@ -82,6 +82,12 @@ class ApiConfig {
   static const String broadcastAuth = '/broadcasting/auth';
   static String get broadcastAuthUrl => '$baseUrl$broadcastAuth';
 
+  // Seller product management
+  static const String myStore = '/my-store';
+  // POST /product, GET /product/all/paginated (?store_id=), PUT/DELETE /product/{id}
+  // reuse `products`, `productsPaginated`, and `categoriesPaginated` above.
+  static String productById(String id) => '/product/$id';
+
   // ── Reverb (WebSocket) ────────────────────────────────────────────
   // Values mirror docker-compose.yml. nginx proxies /app to the reverb
   // container, so the client connects on the normal web port rather
