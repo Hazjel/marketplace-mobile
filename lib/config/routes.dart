@@ -9,6 +9,7 @@ import 'package:blukios_marketplace/features/address/screens/address_form_screen
 import 'package:blukios_marketplace/features/address/screens/address_list_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/login_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/register_screen.dart';
+import 'package:blukios_marketplace/features/auth/screens/splash_screen.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
@@ -132,7 +133,21 @@ class AppRoutes {
               AppShell(navigationShell: navigationShell),
           branches: [
             StatefulShellBranch(
-              routes: [GoRoute(path: home, builder: (_, __) => const HomeScreen())],
+              routes: [
+                GoRoute(
+                  path: home,
+                  // While the saved session is still being validated
+                  // (AuthState.unknown), the redirect callback above
+                  // deliberately holds its decision (`return null`) rather
+                  // than bouncing anywhere — so without this check the real
+                  // home screen would render underneath for a moment before
+                  // any redirect to /login fires. Show a splash instead.
+                  builder: (_, __) =>
+                      ref.read(authProvider).state == AuthState.unknown
+                          ? const SplashScreen()
+                          : const HomeScreen(),
+                ),
+              ],
             ),
             StatefulShellBranch(
               routes: [

@@ -7,6 +7,7 @@ import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/responsive.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
 import 'package:blukios_marketplace/features/home/models/category_model.dart';
+import 'package:blukios_marketplace/features/home/viewmodels/home_products_viewmodel.dart';
 import 'package:blukios_marketplace/features/home/viewmodels/home_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
@@ -21,20 +22,45 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(homeProvider.notifier).loadData();
+      ref.read(homeProductsProvider.notifier).loadFirstPage();
       // Cart drives the header badge, so it needs loading here too.
       ref.read(cartProvider.notifier).loadCart();
     });
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(homeProductsProvider.notifier).loadNextPage();
+    }
+  }
+
+  Future<void> _onRefresh() async {
+    await Future.wait([
+      ref.read(homeProvider.notifier).loadData(),
+      ref.read(homeProductsProvider.notifier).loadFirstPage(),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final viewModel = ref.watch(homeProvider);
     final notifier = ref.read(homeProvider.notifier);
+    final productsState = ref.watch(homeProductsProvider);
     final cartCount = ref.watch(
       cartProvider.select(
         (s) => s.groups.fold<int>(0, (sum, g) => sum + g.itemCount),
@@ -43,13 +69,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: notifier.loadData,
+        onRefresh: _onRefresh,
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             _HomeHeader(cartCount: cartCount),
-            if (viewModel.isLoading)
+            if (viewModel.isLoading && productsState.isLoading)
               const SliverToBoxAdapter(child: ProductGridSkeleton())
-            else if (viewModel.error != null)
+            else if (viewModel.error != null && viewModel.categories.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: ErrorState(
@@ -66,7 +93,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SliverToBoxAdapter(
                 child: _SectionHeader(title: 'Produk Terbaru'),
               ),
-              if (viewModel.products.isEmpty)
+              if (productsState.error != null && productsState.items.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ErrorState(
+                    message: productsState.error!,
+                    onRetry: () =>
+                        ref.read(homeProductsProvider.notifier).loadFirstPage(),
+                  ),
+                )
+              else if (productsState.items.isEmpty && !productsState.isLoading)
                 const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
@@ -77,10 +113,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 )
-              else
+              else ...[
                 SliverPadding(
                   padding: Responsive.getScreenPadding(context)
-                      .copyWith(bottom: AppTheme.spacingXL),
+                      .copyWith(bottom: AppTheme.spacingSM),
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: Responsive.getGridCrossAxisCount(context),
@@ -90,17 +126,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        final product = viewModel.products[index];
+                        final product = productsState.items[index];
                         return ProductCard(
                           product: product,
                           onTap: () => context
                               .push(AppRoutes.productDetailPath(product.slug)),
                         );
                       },
-                      childCount: viewModel.products.length,
+                      childCount: productsState.items.length,
                     ),
                   ),
                 ),
+                if (productsState.isLoadingMore)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                if (!productsState.hasMore && productsState.items.isNotEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(
+                        child: Text(
+                          'Semua produk telah ditampilkan',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppTheme.spacingXL),
+                ),
+              ],
             ],
           ],
         ),
