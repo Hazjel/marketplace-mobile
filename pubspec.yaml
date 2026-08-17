@@ -34,12 +34,23 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   mocktail: ^1.0.4
   flutter_secure_storage_platform_interface: ^1.1.2
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/icons/
     - assets/brand/
+
+# App launcher icon — source: e:\blue\fe-blue\src\assets\images\logos\logo-notext.svg
+# (Blukios' icon-only mark, rasterized to assets/brand/app_icon.png). Run
+# `dart run flutter_launcher_icons` after changing this to regenerate the
+# platform icon files.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/brand/app_icon.png"
+  min_sdk_android: 21
 
 # path_provider_android >=2.3.0 switched to JNI-based codegen (jni/jni_flutter)
 # whose generated bindings reference a `java.io.File` shim that isn't present
