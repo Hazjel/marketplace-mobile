@@ -2,6 +2,8 @@
 
 Aplikasi mobile marketplace berbasis Flutter yang terintegrasi dengan Laravel 12 API (api-blue).
 
+CI/CD: Jenkins (`Jenkinsfile` di root repo ini) — server Jenkins sama dengan yang dipakai `e:\blue`, job perlu dibuat manual di server (lihat catatan di bawah `Jenkinsfile`).
+
 ## Arsitektur
 
 Menggunakan **Clean Architecture** dengan struktur folder:
