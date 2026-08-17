@@ -22,6 +22,11 @@ class TransactionModel {
   final String? createdAt;
   final List<TransactionDetailModel> transactionDetails;
 
+  /// Product ids already reviewed within this transaction — from the
+  /// `product_reviews` relation, present when the API loads it (e.g. on
+  /// `GET /transaction/{id}`, not necessarily on the list endpoint).
+  final Set<String> reviewedProductIds;
+
   TransactionModel({
     required this.id,
     required this.code,
@@ -45,6 +50,7 @@ class TransactionModel {
     this.snapToken,
     this.createdAt,
     required this.transactionDetails,
+    this.reviewedProductIds = const {},
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -76,6 +82,40 @@ class TransactionModel {
               .map((e) => TransactionDetailModel.fromJson(e))
               .toList()
           : [],
+      reviewedProductIds: json['product_reviews'] is List
+          ? (json['product_reviews'] as List)
+              .map((e) => (e as Map)['product_id']?.toString())
+              .whereType<String>()
+              .toSet()
+          : const {},
+    );
+  }
+
+  TransactionModel copyWith({Set<String>? reviewedProductIds}) {
+    return TransactionModel(
+      id: id,
+      code: code,
+      storeId: storeId,
+      storeName: storeName,
+      addressId: addressId,
+      address: address,
+      city: city,
+      postalCode: postalCode,
+      destLatitude: destLatitude,
+      destLongitude: destLongitude,
+      shipping: shipping,
+      shippingType: shippingType,
+      shippingCost: shippingCost,
+      trackingNumber: trackingNumber,
+      deliveryProof: deliveryProof,
+      deliveryStatus: deliveryStatus,
+      tax: tax,
+      grandTotal: grandTotal,
+      paymentStatus: paymentStatus,
+      snapToken: snapToken,
+      createdAt: createdAt,
+      transactionDetails: transactionDetails,
+      reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
     );
   }
 

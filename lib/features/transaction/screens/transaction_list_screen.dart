@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
+import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
@@ -38,6 +40,19 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
     }
   }
 
+  Future<void> _reviewItem(TransactionModel trx, TransactionDetailModel item) async {
+    final submitted = await context.push<bool>(
+      AppRoutes.reviewFormPath(trx.id, item.productId),
+      extra: {
+        'productName': item.productName ?? 'Produk',
+        'productThumbnail': item.productThumbnail,
+      },
+    );
+    if (submitted == true) {
+      ref.read(transactionProvider.notifier).markReviewed(trx.id, item.productId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = ref.watch(transactionProvider);
@@ -69,6 +84,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                         itemBuilder: (context, index) => _TransactionCard(
                           trx: viewModel.transactions[index],
                           onCheckStatus: _refreshStatus,
+                          onReview: (item) => _reviewItem(viewModel.transactions[index], item),
                         ),
                       ),
                     ),
@@ -79,8 +95,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 class _TransactionCard extends StatelessWidget {
   final TransactionModel trx;
   final Future<void> Function(TransactionModel) onCheckStatus;
+  final Future<void> Function(TransactionDetailModel) onReview;
 
-  const _TransactionCard({required this.trx, required this.onCheckStatus});
+  const _TransactionCard({
+    required this.trx,
+    required this.onCheckStatus,
+    required this.onReview,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +190,23 @@ class _TransactionCard extends StatelessWidget {
                 label: const Text('Cek Status Pembayaran'),
               ),
             ),
+          ],
+          if (trx.deliveryStatus == 'completed') ...[
+            for (final item in trx.transactionDetails)
+              if (!trx.reviewedProductIds.contains(item.productId)) ...[
+                const SizedBox(height: AppTheme.spacingSM),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => onReview(item),
+                    child: Text(
+                      'Beri Ulasan: ${item.productName ?? 'Produk'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
           ],
         ],
       ),

@@ -58,6 +58,18 @@ class TransactionNotifier extends Notifier<TransactionData> {
       return e.toString();
     }
   }
+
+  /// Marks [productId] as reviewed within [transactionId] locally, so the
+  /// "Beri Ulasan" button hides immediately after a successful submit
+  /// without needing a full reload.
+  void markReviewed(String transactionId, String productId) {
+    state = state.copyWith(
+      transactions: state.transactions.map((t) {
+        if (t.id != transactionId) return t;
+        return t.copyWith(reviewedProductIds: {...t.reviewedProductIds, productId});
+      }).toList(),
+    );
+  }
 }
 
 final transactionProvider =

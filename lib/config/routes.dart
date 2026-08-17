@@ -20,6 +20,7 @@ import 'package:blukios_marketplace/features/checkout/screens/checkout_screen.da
 import 'package:blukios_marketplace/features/checkout/screens/payment_webview_screen.dart';
 import 'package:blukios_marketplace/features/home/screens/home_screen.dart';
 import 'package:blukios_marketplace/features/product/screens/product_detail_screen.dart';
+import 'package:blukios_marketplace/features/review/screens/review_form_screen.dart';
 import 'package:blukios_marketplace/features/search/screens/search_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
@@ -54,11 +55,14 @@ class AppRoutes {
   static const String dashboard = '/account/dashboard';
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
+  static const String reviewForm = '/review/:transactionId/:productId';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
   static String storeDetailPath(String username) => '/store/$username';
   static String chatThreadPath(String partnerId) => '/chat/$partnerId';
+  static String reviewFormPath(String transactionId, String productId) =>
+      '/review/$transactionId/$productId';
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -224,6 +228,20 @@ class AppRoutes {
           builder: (context, state) => ChatThreadScreen(
             partnerId: state.pathParameters['partnerId'] ?? '',
           ),
+        ),
+        GoRoute(
+          path: reviewForm,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) {
+            final extra = state.extra;
+            final args = extra is Map ? extra : const {};
+            return ReviewFormScreen(
+              transactionId: state.pathParameters['transactionId'] ?? '',
+              productId: state.pathParameters['productId'] ?? '',
+              productName: args['productName'] as String? ?? 'Produk',
+              productThumbnail: args['productThumbnail'] as String?,
+            );
+          },
         ),
       ],
     );
