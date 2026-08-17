@@ -81,6 +81,29 @@ class SellerProductRepository {
               'is_thumbnail': image.isThumbnail ? 1 : 0,
             },
         ],
+      // `variants` mirrors the `product_images` encoding above: Dio's
+      // FormData.fromMap can't take nested JSON over multipart, but it does
+      // walk a List<Map> and flatten it into repeated bracketed fields —
+      // e.g. variants[0][name], variants[0][variant_attributes][Warna] —
+      // which is exactly the `variants.*.name` / `variants.*.variant_attributes`
+      // shape ProductStoreRequest/ProductUpdateRequest expect from Laravel's
+      // own array-of-objects form parsing. Only send the key when the
+      // seller actually turned variants on — an empty/omitted `variants`
+      // field is what tells the API this product has none.
+      if (payload.hasVariants && payload.variants.isNotEmpty)
+        'variants': [
+          for (final variant in payload.variants)
+            {
+              if (variant.id != null) 'id': variant.id,
+              'name': variant.name,
+              'price': variant.price,
+              'stock': variant.stock,
+              if (variant.sku != null && variant.sku!.isNotEmpty)
+                'sku': variant.sku,
+              if (variant.variantAttributes.isNotEmpty)
+                'variant_attributes': variant.variantAttributes,
+            },
+        ],
     });
   }
 }

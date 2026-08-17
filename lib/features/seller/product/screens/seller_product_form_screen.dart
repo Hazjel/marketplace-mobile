@@ -17,6 +17,13 @@ import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 /// images on update — there is no field to delete or re-flag an existing
 /// image's thumbnail, so in edit mode existing images are shown read-only
 /// and newly added ones are appended alongside them.
+///
+/// Note on variants: when `hasVariants` is on, the API recomputes the
+/// top-level price (minimum variant price) and stock (sum of variant
+/// stocks) from the variant list — see `ProductRepository::create`/`update`
+/// on the Laravel side. The top-level Harga/Stok fields below stay
+/// required (the API still validates them unconditionally) but effectively
+/// become informational once variants exist.
 class SellerProductFormScreen extends ConsumerStatefulWidget {
   final SellerProductModel? existing;
 
@@ -51,6 +58,14 @@ class _SellerProductFormScreenState
   final List<SellerProductNewImage> _newImages = [];
   String? _errorMessage;
 
+  /// Stable identities for the variant rows in the provider's list, so each
+  /// `_VariantRowEditor`'s own `TextEditingController`s survive provider
+  /// rebuilds (a new list instance on every keystroke) instead of getting
+  /// recreated and losing focus/cursor position.
+  final List<int> _variantRowKeys = [];
+  int _variantKeyCounter = 0;
+  int _nextVariantKey() => _variantKeyCounter++;
+
   bool get _isEditing => widget.existing != null;
   bool get _hasExistingImages =>
       _isEditing && widget.existing!.images.isNotEmpty;
@@ -66,7 +81,17 @@ class _SellerProductFormScreenState
     super.initState();
     _categoryId = widget.existing?.categoryId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(sellerProductFormProvider.notifier).init();
+      final notifier = ref.read(sellerProductFormProvider.notifier);
+      notifier.init();
+      notifier.loadExistingVariants(widget.existing);
+      final seededCount = ref.read(sellerProductFormProvider).variants.length;
+      if (seededCount > 0) {
+        setState(() {
+          _variantRowKeys.addAll(
+            List.generate(seededCount, (_) => _nextVariantKey()),
+          );
+        });
+      }
     });
   }
 
@@ -126,6 +151,23 @@ class _SellerProductFormScreenState
     });
   }
 
+  void _setHasVariants(bool value) {
+    ref.read(sellerProductFormProvider.notifier).setHasVariants(value);
+    if (!value) {
+      setState(() => _variantRowKeys.clear());
+    }
+  }
+
+  void _addVariant() {
+    ref.read(sellerProductFormProvider.notifier).addVariant();
+    setState(() => _variantRowKeys.add(_nextVariantKey()));
+  }
+
+  void _removeVariant(int index) {
+    ref.read(sellerProductFormProvider.notifier).removeVariant(index);
+    setState(() => _variantRowKeys.removeAt(index));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -138,9 +180,14 @@ class _SellerProductFormScreenState
       return;
     }
 
+    final formState = ref.read(sellerProductFormProvider);
+    if (formState.hasVariants && formState.variants.isEmpty) {
+      setState(() => _errorMessage = 'Tambahkan minimal satu varian');
+      return;
+    }
+
     setState(() => _errorMessage = null);
 
-    final formState = ref.read(sellerProductFormProvider);
     final storeId = formState.store?.id;
     if (storeId == null) {
       setState(() => _errorMessage = 'Data toko belum siap, coba lagi');
@@ -157,6 +204,8 @@ class _SellerProductFormScreenState
       weight: double.tryParse(_weightController.text.trim()) ?? 0,
       stock: int.tryParse(_stockController.text.trim()) ?? 0,
       newImages: _newImages,
+      hasVariants: formState.hasVariants,
+      variants: formState.variants,
     );
 
     final notifier = ref.read(sellerProductFormProvider.notifier);
@@ -276,7 +325,13 @@ class _SellerProductFormScreenState
                 TextFormField(
                   controller: _priceController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Harga (Rp)'),
+                  decoration: InputDecoration(
+                    labelText: 'Harga (Rp)',
+                    helperText: formState.hasVariants
+                        ? 'Akan diganti otomatis dengan harga terendah dari varian'
+                        : null,
+                    helperMaxLines: 2,
+                  ),
                   validator: (v) {
                     final n = double.tryParse((v ?? '').trim());
                     if (n == null || n < 0) return 'Harga tidak valid';
@@ -300,13 +355,66 @@ class _SellerProductFormScreenState
                 TextFormField(
                   controller: _stockController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Stok'),
+                  decoration: InputDecoration(
+                    labelText: 'Stok',
+                    helperText: formState.hasVariants
+                        ? 'Akan diganti otomatis dengan total stok varian'
+                        : null,
+                    helperMaxLines: 2,
+                  ),
                   validator: (v) {
                     final n = int.tryParse((v ?? '').trim());
                     if (n == null || n < 0) return 'Stok tidak valid';
                     return null;
                   },
                 ),
+                const SizedBox(height: AppTheme.spacingLG),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacingMD,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkCard : AppTheme.cardWhite,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXLCard),
+                    border: Border.all(
+                      color: isDark ? AppTheme.darkBorder : AppTheme.border,
+                    ),
+                  ),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: formState.hasVariants,
+                    onChanged: _setHasVariants,
+                    title: const Text(
+                      'Produk ini punya varian?',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Aktifkan jika produk dijual dalam beberapa pilihan, mis. warna atau ukuran.',
+                      style: AppTheme.bodySm.copyWith(color: muted),
+                    ),
+                  ),
+                ),
+
+                if (formState.hasVariants) ...[
+                  const SizedBox(height: AppTheme.spacingMD),
+                  for (var i = 0; i < formState.variants.length; i++)
+                    _VariantRowEditor(
+                      key: ValueKey(_variantRowKeys[i]),
+                      index: i,
+                      variant: formState.variants[i],
+                      isDark: isDark,
+                      onChanged: (updated) => ref
+                          .read(sellerProductFormProvider.notifier)
+                          .updateVariant(i, updated),
+                      onRemove: () => _removeVariant(i),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _addVariant,
+                    icon: const AppIcon(AppIcons.plus, size: AppIconSize.md),
+                    label: const Text('Tambah Varian'),
+                  ),
+                ],
                 const SizedBox(height: AppTheme.spacingLG),
 
                 Text('Gambar Produk', style: AppTheme.labelMd.copyWith(color: muted)),
@@ -475,6 +583,250 @@ class _ImageTile extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One editable key/value pair inside a variant's attribute list, e.g.
+/// {"Warna": "Merah"}. Owns its own controllers so [_VariantRowEditor] can
+/// keep a stable list across rebuilds.
+class _AttributeRow {
+  final TextEditingController key;
+  final TextEditingController value;
+
+  _AttributeRow({String key = '', String value = ''})
+      : key = TextEditingController(text: key),
+        value = TextEditingController(text: value);
+
+  void dispose() {
+    key.dispose();
+    value.dispose();
+  }
+}
+
+/// A single variant's editable fields (name/price/stock/sku + a repeatable
+/// attribute key-value editor). Owns its own [TextEditingController]s,
+/// seeded once from [variant] and never overwritten by later rebuilds —
+/// only [onChanged] pushes edits back out, to [SellerProductFormNotifier]
+/// via the parent screen. Give this a stable [Key] per row (not an index
+/// key) so reordering/removal doesn't scramble which controllers belong to
+/// which row.
+class _VariantRowEditor extends StatefulWidget {
+  final int index;
+  final SellerProductVariantModel variant;
+  final bool isDark;
+  final ValueChanged<SellerProductVariantModel> onChanged;
+  final VoidCallback onRemove;
+
+  const _VariantRowEditor({
+    super.key,
+    required this.index,
+    required this.variant,
+    required this.isDark,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  @override
+  State<_VariantRowEditor> createState() => _VariantRowEditorState();
+}
+
+class _VariantRowEditorState extends State<_VariantRowEditor> {
+  late final _nameController = TextEditingController(text: widget.variant.name);
+  late final _priceController = TextEditingController(
+    text: widget.variant.price == 0
+        ? ''
+        : _SellerProductFormScreenState._trimDecimal(widget.variant.price),
+  );
+  late final _stockController = TextEditingController(
+    text: widget.variant.stock == 0 ? '' : widget.variant.stock.toString(),
+  );
+  late final _skuController = TextEditingController(text: widget.variant.sku);
+  late final List<_AttributeRow> _attributes = widget.variant.variantAttributes
+      .entries
+      .map((e) => _AttributeRow(key: e.key, value: e.value))
+      .toList();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _stockController.dispose();
+    _skuController.dispose();
+    for (final attr in _attributes) {
+      attr.dispose();
+    }
+    super.dispose();
+  }
+
+  void _emitChange() {
+    final attrs = <String, String>{};
+    for (final attr in _attributes) {
+      final key = attr.key.text.trim();
+      if (key.isNotEmpty) attrs[key] = attr.value.text.trim();
+    }
+    widget.onChanged(
+      widget.variant.copyWith(
+        name: _nameController.text.trim(),
+        price: double.tryParse(_priceController.text.trim()) ?? 0,
+        stock: int.tryParse(_stockController.text.trim()) ?? 0,
+        sku: _skuController.text.trim().isEmpty ? null : _skuController.text.trim(),
+        variantAttributes: attrs,
+      ),
+    );
+  }
+
+  void _addAttribute() {
+    setState(() => _attributes.add(_AttributeRow()));
+  }
+
+  void _removeAttribute(int index) {
+    setState(() {
+      _attributes[index].dispose();
+      _attributes.removeAt(index);
+    });
+    _emitChange();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted =
+        widget.isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      decoration: BoxDecoration(
+        color: widget.isDark ? AppTheme.darkCard : AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXLCard),
+        border: Border.all(
+          color: widget.isDark ? AppTheme.darkBorder : AppTheme.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Varian ${widget.index + 1}',
+                  style: AppTheme.labelMd.copyWith(color: muted),
+                ),
+              ),
+              IconButton(
+                onPressed: widget.onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const AppIcon(
+                  AppIcons.trash,
+                  size: AppIconSize.sm,
+                  color: AppTheme.error,
+                  semanticsLabel: 'Hapus varian',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingSM),
+          TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: 'Nama Varian'),
+            onChanged: (_) => _emitChange(),
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Nama varian wajib diisi' : null,
+          ),
+          const SizedBox(height: AppTheme.spacingSM),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Harga (Rp)'),
+                  onChanged: (_) => _emitChange(),
+                  validator: (v) {
+                    final n = double.tryParse((v ?? '').trim());
+                    if (n == null || n < 0) return 'Tidak valid';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingSM),
+              Expanded(
+                child: TextFormField(
+                  controller: _stockController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Stok'),
+                  onChanged: (_) => _emitChange(),
+                  validator: (v) {
+                    final n = int.tryParse((v ?? '').trim());
+                    if (n == null || n < 0) return 'Tidak valid';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingSM),
+          TextFormField(
+            controller: _skuController,
+            decoration: const InputDecoration(labelText: 'SKU (opsional)'),
+            onChanged: (_) => _emitChange(),
+          ),
+          const SizedBox(height: AppTheme.spacingSM),
+          Text('Atribut Varian', style: AppTheme.bodySm.copyWith(color: muted)),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _attributes.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _attributes[i].key,
+                      decoration: const InputDecoration(
+                        hintText: 'Nama (mis. Warna)',
+                        isDense: true,
+                      ),
+                      onChanged: (_) => _emitChange(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _attributes[i].value,
+                      decoration: const InputDecoration(
+                        hintText: 'Nilai (mis. Merah)',
+                        isDense: true,
+                      ),
+                      onChanged: (_) => _emitChange(),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _removeAttribute(i),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const AppIcon(
+                      AppIcons.close,
+                      size: AppIconSize.sm,
+                      color: AppTheme.error,
+                      semanticsLabel: 'Hapus atribut',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _addAttribute,
+              icon: const AppIcon(AppIcons.plus, size: AppIconSize.sm),
+              label: const Text('Tambah Atribut'),
+            ),
+          ),
         ],
       ),
     );

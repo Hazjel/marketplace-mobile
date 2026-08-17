@@ -1,3 +1,5 @@
+import 'package:blukios_marketplace/features/seller/product/models/seller_product_model.dart';
+
 /// A newly-picked-but-not-yet-uploaded product image, held as a local file
 /// path until the form is submitted.
 class SellerProductNewImage {
@@ -19,9 +21,6 @@ class SellerProductNewImage {
 
 /// Everything [SellerProductRepository.createProduct] /
 /// `updateProduct` need, assembled by the form screen from its controllers.
-///
-/// Variants are out of scope for this pass (see feature notes) — the API
-/// accepts them, but this app doesn't build the payload for them yet.
 class SellerProductPayload {
   final String storeId;
   final String categoryId;
@@ -38,6 +37,20 @@ class SellerProductPayload {
   /// so this may be empty when the seller didn't add any.
   final List<SellerProductNewImage> newImages;
 
+  /// Whether the seller is selling this product as a set of variants
+  /// rather than a single price/stock. When true, [variants] must be
+  /// non-empty — the API (`ProductRepository::create`/`update`) recomputes
+  /// [price] as the minimum variant price and [stock] as the sum of variant
+  /// stocks, so the top-level price/stock the seller entered end up
+  /// informational only in that case (still required by validation, so we
+  /// always send them).
+  final bool hasVariants;
+
+  /// Each entry with a non-null [SellerProductVariantModel.id] updates that
+  /// existing variant; entries with a null id are created as new variants
+  /// (update-only — on create every variant is necessarily new).
+  final List<SellerProductVariantModel> variants;
+
   const SellerProductPayload({
     required this.storeId,
     required this.categoryId,
@@ -48,5 +61,7 @@ class SellerProductPayload {
     required this.weight,
     required this.stock,
     this.newImages = const [],
+    this.hasVariants = false,
+    this.variants = const [],
   });
 }

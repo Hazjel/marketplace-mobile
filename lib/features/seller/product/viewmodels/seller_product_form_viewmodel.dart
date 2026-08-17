@@ -13,12 +13,19 @@ class SellerProductFormData {
   final bool isSaving;
   final String? errorMessage;
 
+  /// Whether the seller is selling this product as a set of variants
+  /// rather than a single price/stock.
+  final bool hasVariants;
+  final List<SellerProductVariantModel> variants;
+
   const SellerProductFormData({
     this.store,
     this.categories = const [],
     this.isLoadingCategories = true,
     this.isSaving = false,
     this.errorMessage,
+    this.hasVariants = false,
+    this.variants = const [],
   });
 
   SellerProductFormData copyWith({
@@ -28,6 +35,8 @@ class SellerProductFormData {
     bool? isSaving,
     String? errorMessage,
     bool clearError = false,
+    bool? hasVariants,
+    List<SellerProductVariantModel>? variants,
   }) {
     return SellerProductFormData(
       store: store ?? this.store,
@@ -35,13 +44,16 @@ class SellerProductFormData {
       isLoadingCategories: isLoadingCategories ?? this.isLoadingCategories,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      hasVariants: hasVariants ?? this.hasVariants,
+      variants: variants ?? this.variants,
     );
   }
 }
 
 /// Backs the create/edit product form: resolves the seller's own store,
 /// loads sub-categories for the category picker (only leaf categories —
-/// the API rejects a top-level one), and submits the create/update calls.
+/// the API rejects a top-level one), submits the create/update calls, and
+/// owns the variant list the form's variants section edits.
 class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormData> {
   @override
   SellerProductFormData build() => const SellerProductFormData();
@@ -68,6 +80,44 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
         errorMessage: 'Gagal memuat data toko/kategori: $e',
       );
     }
+  }
+
+  /// Seeds the variants section from an existing product when editing.
+  /// Call once, before the user has had a chance to touch the toggle.
+  void loadExistingVariants(SellerProductModel? existing) {
+    if (existing == null || existing.variants.isEmpty) return;
+    state = state.copyWith(hasVariants: true, variants: existing.variants);
+  }
+
+  void setHasVariants(bool value) {
+    state = state.copyWith(
+      hasVariants: value,
+      // Dropping the toggle clears the rows too — flipping it back on
+      // starts from a clean slate rather than resurrecting stale rows.
+      variants: value ? state.variants : const [],
+    );
+  }
+
+  void addVariant() {
+    state = state.copyWith(
+      variants: [
+        ...state.variants,
+        const SellerProductVariantModel(name: '', price: 0, stock: 0),
+      ],
+    );
+  }
+
+  void updateVariant(int index, SellerProductVariantModel variant) {
+    if (index < 0 || index >= state.variants.length) return;
+    final updated = [...state.variants];
+    updated[index] = variant;
+    state = state.copyWith(variants: updated);
+  }
+
+  void removeVariant(int index) {
+    if (index < 0 || index >= state.variants.length) return;
+    final updated = [...state.variants]..removeAt(index);
+    state = state.copyWith(variants: updated);
   }
 
   /// Returns the created product on success, or null with
