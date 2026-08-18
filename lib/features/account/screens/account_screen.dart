@@ -95,6 +95,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                       label: 'Dompet Toko',
                       onTap: () => context.push(AppRoutes.sellerWallet),
                     ),
+                    _MenuTile(
+                      icon: AppIcons.tag,
+                      label: 'Voucher Toko',
+                      onTap: () => context.push(AppRoutes.sellerVouchers),
+                    ),
                   ],
                 )
               : _MenuSection(

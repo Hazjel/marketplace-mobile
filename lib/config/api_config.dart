@@ -117,4 +117,8 @@ class ApiConfig {
 
   // Voucher / redeem code
   static const String voucherValidate = '/voucher/validate';
+
+  // Seller voucher management
+  static const String sellerVouchers = '/my-store/vouchers';
+  static String sellerVoucherById(String id) => '/my-store/vouchers/$id';
 }

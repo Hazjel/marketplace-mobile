@@ -31,6 +31,9 @@ import 'package:blukios_marketplace/features/seller/product/screens/seller_produ
 import 'package:blukios_marketplace/features/seller/product/screens/seller_product_list_screen.dart';
 import 'package:blukios_marketplace/features/seller/store/screens/seller_onboarding_screen.dart';
 import 'package:blukios_marketplace/features/seller/store/screens/seller_store_profile_screen.dart';
+import 'package:blukios_marketplace/features/seller/voucher/models/seller_voucher_model.dart';
+import 'package:blukios_marketplace/features/seller/voucher/screens/seller_voucher_form_screen.dart';
+import 'package:blukios_marketplace/features/seller/voucher/screens/seller_voucher_list_screen.dart';
 import 'package:blukios_marketplace/features/seller/wallet/models/seller_wallet_model.dart';
 import 'package:blukios_marketplace/features/seller/wallet/screens/seller_wallet_screen.dart';
 import 'package:blukios_marketplace/features/seller/wallet/screens/withdrawal_form_screen.dart';
@@ -82,6 +85,8 @@ class AppRoutes {
   static const String sellerDashboard = '/seller/dashboard';
   static const String sellerWallet = '/seller/wallet';
   static const String sellerWalletWithdraw = '/seller/wallet/withdraw';
+  static const String sellerVouchers = '/seller/vouchers';
+  static const String sellerVoucherForm = '/seller/vouchers/form';
 
   static String productDetailPath(String slug) => '/product/$slug';
   static String paymentPath(String transactionId) => '/payment/$transactionId';
@@ -347,6 +352,18 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) =>
               WithdrawalFormScreen(balance: state.extra as StoreBalanceModel),
+        ),
+        GoRoute(
+          path: sellerVouchers,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const SellerVoucherListScreen(),
+        ),
+        GoRoute(
+          path: sellerVoucherForm,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => SellerVoucherFormScreen(
+            existing: state.extra as SellerVoucherModel?,
+          ),
         ),
       ],
     );
