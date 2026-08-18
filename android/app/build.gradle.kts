@@ -28,6 +28,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications (used by NotificationService for
+        // foreground FCM display) needs Java 8+ APIs desugared for devices
+        // below API 26 — without this the build fails at
+        // :app:checkDebugAarMetadata.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -71,6 +76,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Required by isCoreLibraryDesugaringEnabled above.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 // Applied only if the Firebase config file actually exists — the plugin

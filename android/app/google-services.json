@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "757404571049",
+    "project_id": "blukios-marketplace",
+    "storage_bucket": "blukios-marketplace.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:757404571049:android:0afdebe0317b0d17ec60b8",
+        "android_client_info": {
+          "package_name": "com.blukios.marketplace"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBySSVGSAOPsk6Ov6zqGf1agaFbe6w08ec"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/app.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
+import 'package:blukios_marketplace/core/monitoring/notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ void main() {
     try {
       await Firebase.initializeApp();
       AnalyticsService.markInitialized();
+      await NotificationService.initialize();
 
       FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
       PlatformDispatcher.instance.onError = (error, stack) {

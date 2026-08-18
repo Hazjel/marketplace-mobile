@@ -121,4 +121,7 @@ class ApiConfig {
   // Seller voucher management
   static const String sellerVouchers = '/my-store/vouchers';
   static String sellerVoucherById(String id) => '/my-store/vouchers/$id';
+
+  // Push notifications — device token registration
+  static const String deviceToken = '/device-token';
 }

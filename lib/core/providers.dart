@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/monitoring/device_token_repository.dart';
 import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
@@ -40,6 +41,10 @@ final transactionRepositoryProvider = Provider<TransactionRepository>(
 
 final voucherRepositoryProvider = Provider<VoucherRepository>(
   (ref) => VoucherRepository(ref.watch(apiClientProvider)),
+);
+
+final deviceTokenRepositoryProvider = Provider<DeviceTokenRepository>(
+  (ref) => DeviceTokenRepository(ref.watch(apiClientProvider)),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(

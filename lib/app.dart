@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
+import 'package:blukios_marketplace/core/monitoring/notification_providers.dart';
+import 'package:blukios_marketplace/core/monitoring/notification_service.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/chat/viewmodels/chat_viewmodel.dart';
 import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
@@ -33,6 +35,15 @@ class _BlukiosAppState extends ConsumerState<BlukiosApp> {
         ref.read(wishlistProvider.notifier).loadWishlist();
       }
     });
+
+    // A push notification tap (foreground, background, or cold-start) lands
+    // here regardless of which screen the app happens to open on. No
+    // per-transaction deep link yet (backend doesn't send one) — routing to
+    // the list is enough since it already shows live status via Reverb.
+    NotificationService.onNotificationTap.listen((_) {
+      final router = ref.read(routerProvider);
+      router.go(AppRoutes.transactions);
+    });
   }
 
   @override
@@ -40,6 +51,8 @@ class _BlukiosAppState extends ConsumerState<BlukiosApp> {
     // Keeps the chat websocket alive for the app's lifetime; it connects
     // and tears itself down as auth state changes.
     ref.watch(chatRealtimeProvider);
+    // Keeps the backend's device_tokens table in sync with sign-in/sign-out.
+    ref.watch(pushNotificationRealtimeProvider);
 
     return MaterialApp.router(
       title: 'Blukios Marketplace',
