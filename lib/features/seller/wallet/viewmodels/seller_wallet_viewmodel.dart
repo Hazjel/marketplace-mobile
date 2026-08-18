@@ -158,8 +158,13 @@ class WithdrawalFormData {
 }
 
 class WithdrawalFormNotifier extends AutoDisposeNotifier<WithdrawalFormData> {
+  bool _disposed = false;
+
   @override
-  WithdrawalFormData build() => const WithdrawalFormData();
+  WithdrawalFormData build() {
+    ref.onDispose(() => _disposed = true);
+    return const WithdrawalFormData();
+  }
 
   /// Returns the created withdrawal on success, or null on failure (with
   /// [WithdrawalFormData.error] populated — this surfaces the server's
@@ -183,9 +188,11 @@ class WithdrawalFormNotifier extends AutoDisposeNotifier<WithdrawalFormData> {
                 bankAccountNumber: bankAccountNumber,
                 bankName: bankName,
               );
+      if (_disposed) return null;
       state = state.copyWith(isSubmitting: false, result: withdrawal);
       return withdrawal;
     } catch (e) {
+      if (_disposed) return null;
       state = state.copyWith(
         isSubmitting: false,
         error: e is ValidationException ? e.firstError : e.toString(),

@@ -59,8 +59,13 @@ class ReviewFormData {
 
 class ReviewFormNotifier
     extends AutoDisposeFamilyNotifier<ReviewFormData, ReviewTarget> {
+  bool _disposed = false;
+
   @override
-  ReviewFormData build(ReviewTarget arg) => const ReviewFormData();
+  ReviewFormData build(ReviewTarget arg) {
+    ref.onDispose(() => _disposed = true);
+    return const ReviewFormData();
+  }
 
   void setRating(int rating) => state = state.copyWith(rating: rating);
 
@@ -79,9 +84,11 @@ class ReviewFormNotifier
             review: state.review.trim().isEmpty ? null : state.review.trim(),
             isAnonymous: state.isAnonymous,
           );
+      if (_disposed) return false;
       state = state.copyWith(isSubmitting: false, submitted: result);
       return true;
     } catch (e) {
+      if (_disposed) return false;
       state = state.copyWith(isSubmitting: false, error: e.toString());
       return false;
     }

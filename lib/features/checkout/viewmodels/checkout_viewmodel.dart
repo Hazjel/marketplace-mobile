@@ -72,14 +72,20 @@ class CheckoutData {
 /// isolated state and is disposed when the screen closes.
 class CheckoutNotifier
     extends AutoDisposeFamilyNotifier<CheckoutData, CartGroupModel> {
+  bool _disposed = false;
+
   @override
-  CheckoutData build(CartGroupModel group) => CheckoutData(group: group);
+  CheckoutData build(CartGroupModel group) {
+    ref.onDispose(() => _disposed = true);
+    return CheckoutData(group: group);
+  }
 
   Future<void> loadSavedAddresses() async {
     state = state.copyWith(isLoadingAddresses: true);
 
     try {
       final addresses = await ref.read(addressRepositoryProvider).getAddresses();
+      if (_disposed) return;
       final primary = addresses.where((a) => a.isPrimary);
       final preselected = primary.isNotEmpty
           ? primary.first
@@ -95,6 +101,7 @@ class CheckoutNotifier
         clearShippingError: true,
       );
     } catch (_) {
+      if (_disposed) return;
       state = state.copyWith(
         savedAddresses: const [],
         isLoadingAddresses: false,
@@ -141,6 +148,7 @@ class CheckoutNotifier
             weight: state.group.totalWeight,
             receiverCityName: address.city,
           );
+      if (_disposed) return;
 
       state = state.copyWith(
         couriers: couriers,
@@ -150,6 +158,7 @@ class CheckoutNotifier
             : null,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(
         isCalculatingShipping: false,
         shippingError: 'Gagal menghitung ongkir. Silakan coba lagi.',
@@ -197,6 +206,7 @@ class CheckoutNotifier
                         {'product_id': item.productId, 'qty': item.quantity})
                     .toList(),
               );
+      if (_disposed) return null;
       state = state.copyWith(isSubmitting: false);
       AnalyticsService.logEvent('checkout_submitted', parameters: {
         'value': state.grandTotal,
@@ -205,6 +215,7 @@ class CheckoutNotifier
       });
       return transaction;
     } catch (e) {
+      if (_disposed) return null;
       state = state.copyWith(isSubmitting: false, submitError: e.toString());
       return null;
     }

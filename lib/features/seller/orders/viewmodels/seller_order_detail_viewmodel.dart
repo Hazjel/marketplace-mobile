@@ -40,8 +40,13 @@ class SellerOrderDetailData {
 /// and is disposed when the screen closes — same pattern as CheckoutNotifier.
 class SellerOrderDetailNotifier
     extends AutoDisposeFamilyNotifier<SellerOrderDetailData, String> {
+  bool _disposed = false;
+
   @override
-  SellerOrderDetailData build(String orderId) => const SellerOrderDetailData();
+  SellerOrderDetailData build(String orderId) {
+    ref.onDispose(() => _disposed = true);
+    return const SellerOrderDetailData();
+  }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -49,8 +54,10 @@ class SellerOrderDetailNotifier
     try {
       final order =
           await ref.read(transactionRepositoryProvider).getTransactionDetail(arg);
+      if (_disposed) return;
       state = state.copyWith(order: order, isLoading: false);
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -76,9 +83,11 @@ class SellerOrderDetailNotifier
                 trackingNumber: trackingNumber,
                 deliveryProofPath: deliveryProofPath,
               );
+      if (_disposed) return false;
       state = state.copyWith(order: updated, isUpdating: false);
       return true;
     } catch (e) {
+      if (_disposed) return false;
       state = state.copyWith(isUpdating: false, updateError: e.toString());
       return false;
     }

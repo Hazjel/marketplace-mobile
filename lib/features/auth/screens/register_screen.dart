@@ -140,29 +140,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     color: Theme.of(context).inputDecorationTheme.fillColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Pembeli', style: TextStyle(fontSize: 14)),
-                          value: 'buyer',
-                          groupValue: _selectedRole,
-                          onChanged: (v) => setState(() => _selectedRole = v!),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
+                  child: RadioGroup<String>(
+                    groupValue: _selectedRole,
+                    onChanged: (v) => setState(() => _selectedRole = v!),
+                    child: const Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: Text('Pembeli', style: TextStyle(fontSize: 14)),
+                            value: 'buyer',
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Penjual', style: TextStyle(fontSize: 14)),
-                          value: 'store',
-                          groupValue: _selectedRole,
-                          onChanged: (v) => setState(() => _selectedRole = v!),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: Text('Penjual', style: TextStyle(fontSize: 14)),
+                            value: 'store',
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

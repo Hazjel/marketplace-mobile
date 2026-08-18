@@ -104,8 +104,13 @@ class ThreadData {
 
 /// Keyed by the partner's user id.
 class ThreadNotifier extends AutoDisposeFamilyNotifier<ThreadData, String> {
+  bool _disposed = false;
+
   @override
-  ThreadData build(String partnerId) => const ThreadData();
+  ThreadData build(String partnerId) {
+    ref.onDispose(() => _disposed = true);
+    return const ThreadData();
+  }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -118,6 +123,7 @@ class ThreadNotifier extends AutoDisposeFamilyNotifier<ThreadData, String> {
         // shouldn't block the thread itself.
         repo.getUserInfo(arg).then<Object?>((v) => v).catchError((_) => null),
       ]);
+      if (_disposed) return;
 
       state = state.copyWith(
         messages: results[0] as List<MessageModel>,
@@ -125,6 +131,7 @@ class ThreadNotifier extends AutoDisposeFamilyNotifier<ThreadData, String> {
         isLoading: false,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -151,12 +158,14 @@ class ThreadNotifier extends AutoDisposeFamilyNotifier<ThreadData, String> {
             message: text.trim(),
             socketId: ref.read(reverbServiceProvider).socketId,
           );
+      if (_disposed) return null;
       state = state.copyWith(
         messages: [...state.messages, message],
         isSending: false,
       );
       return null;
     } catch (e) {
+      if (_disposed) return e.toString();
       state = state.copyWith(isSending: false);
       return e.toString();
     }

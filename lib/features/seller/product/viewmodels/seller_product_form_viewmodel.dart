@@ -55,19 +55,26 @@ class SellerProductFormData {
 /// the API rejects a top-level one), submits the create/update calls, and
 /// owns the variant list the form's variants section edits.
 class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormData> {
+  bool _disposed = false;
+
   @override
-  SellerProductFormData build() => const SellerProductFormData();
+  SellerProductFormData build() {
+    ref.onDispose(() => _disposed = true);
+    return const SellerProductFormData();
+  }
 
   Future<void> init() async {
     state = state.copyWith(isLoadingCategories: true, clearError: true);
 
     try {
       final store = await ref.read(sellerProductRepositoryProvider).getMyStore();
+      if (_disposed) return;
       // is_parent: false → only sub-categories, which is what
       // ProductStoreRequest/ProductUpdateRequest require.
       final categoriesPage = await ref
           .read(categoryRepositoryProvider)
           .getCategoriesPaginated(page: 1, isParent: false, rowPerPage: 100);
+      if (_disposed) return;
 
       state = state.copyWith(
         store: store,
@@ -75,6 +82,7 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
         isLoadingCategories: false,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(
         isLoadingCategories: false,
         errorMessage: 'Gagal memuat data toko/kategori: $e',
@@ -127,9 +135,11 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
     try {
       final product =
           await ref.read(sellerProductRepositoryProvider).createProduct(payload);
+      if (_disposed) return null;
       state = state.copyWith(isSaving: false);
       return product;
     } catch (e) {
+      if (_disposed) return null;
       state = state.copyWith(isSaving: false, errorMessage: e.toString());
       return null;
     }
@@ -144,9 +154,11 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
       final product = await ref
           .read(sellerProductRepositoryProvider)
           .updateProduct(id, payload);
+      if (_disposed) return null;
       state = state.copyWith(isSaving: false);
       return product;
     } catch (e) {
+      if (_disposed) return null;
       state = state.copyWith(isSaving: false, errorMessage: e.toString());
       return null;
     }

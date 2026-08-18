@@ -296,29 +296,29 @@ class _SellerProductFormScreenState
 
                 Text('Kondisi', style: AppTheme.labelMd.copyWith(color: muted)),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        value: 'new',
-                        groupValue: _condition,
-                        onChanged: (v) => setState(() => _condition = v ?? 'new'),
-                        title: const Text('Baru', style: TextStyle(fontSize: 13)),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
+                RadioGroup<String>(
+                  groupValue: _condition,
+                  onChanged: (v) => setState(() => _condition = v ?? 'new'),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          value: 'new',
+                          title: Text('Baru', style: TextStyle(fontSize: 13)),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        value: 'second',
-                        groupValue: _condition,
-                        onChanged: (v) => setState(() => _condition = v ?? 'new'),
-                        title: const Text('Bekas', style: TextStyle(fontSize: 13)),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
+                      Expanded(
+                        child: RadioListTile<String>(
+                          value: 'second',
+                          title: Text('Bekas', style: TextStyle(fontSize: 13)),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: AppTheme.spacingSM),
 

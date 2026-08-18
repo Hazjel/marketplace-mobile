@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/review/models/review_model.dart';
-import 'package:blukios_marketplace/features/search/data/search_repository.dart';
 import 'package:blukios_marketplace/features/search/models/search_filters.dart';
 import 'package:blukios_marketplace/features/search/viewmodels/search_viewmodel.dart';
 import 'package:blukios_marketplace/features/store/data/store_repository.dart';
@@ -63,8 +62,13 @@ class StoreData {
 /// Keyed by store username so each store page keeps its own state and is
 /// disposed when the screen closes.
 class StoreNotifier extends AutoDisposeFamilyNotifier<StoreData, String> {
+  bool _disposed = false;
+
   @override
-  StoreData build(String username) => const StoreData();
+  StoreData build(String username) {
+    ref.onDispose(() => _disposed = true);
+    return const StoreData();
+  }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true, notFound: false);
@@ -72,6 +76,7 @@ class StoreNotifier extends AutoDisposeFamilyNotifier<StoreData, String> {
     try {
       final repo = ref.read(storeRepositoryProvider);
       final store = await repo.getByUsername(arg);
+      if (_disposed) return;
 
       if (store == null) {
         state = state.copyWith(isLoading: false, notFound: true);
@@ -95,6 +100,7 @@ class StoreNotifier extends AutoDisposeFamilyNotifier<StoreData, String> {
             .catchError((_) => null),
         repo.getFollowStatus(store.id).then<Object?>((v) => v).catchError((_) => null),
       ]);
+      if (_disposed) return;
 
       state = state.copyWith(
         store: store,
@@ -104,6 +110,7 @@ class StoreNotifier extends AutoDisposeFamilyNotifier<StoreData, String> {
         isLoading: false,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -124,9 +131,11 @@ class StoreNotifier extends AutoDisposeFamilyNotifier<StoreData, String> {
       } else {
         await repo.follow(store.id);
       }
+      if (_disposed) return null;
       state = state.copyWith(isTogglingFollow: false);
       return null;
     } catch (e) {
+      if (_disposed) return e.toString();
       state = state.copyWith(isFollowing: wasFollowing, isTogglingFollow: false);
       return e.toString();
     }

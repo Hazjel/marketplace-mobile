@@ -34,8 +34,13 @@ class ProductDetailData {
 /// Keyed by product slug so each product detail screen gets its own state.
 class ProductDetailNotifier
     extends AutoDisposeFamilyNotifier<ProductDetailData, String> {
+  bool _disposed = false;
+
   @override
-  ProductDetailData build(String slug) => const ProductDetailData();
+  ProductDetailData build(String slug) {
+    ref.onDispose(() => _disposed = true);
+    return const ProductDetailData();
+  }
 
   Future<void> loadProduct() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -43,8 +48,10 @@ class ProductDetailNotifier
     try {
       final product =
           await ref.read(productRepositoryProvider).getProductBySlug(arg);
+      if (_disposed) return;
       state = state.copyWith(product: product, isLoading: false);
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -62,7 +69,9 @@ class ProductDetailNotifier
     } catch (e) {
       return e.toString();
     } finally {
-      state = state.copyWith(addingToCart: false);
+      if (!_disposed) {
+        state = state.copyWith(addingToCart: false);
+      }
     }
   }
 }
