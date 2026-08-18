@@ -60,6 +60,7 @@ class TransactionRepository {
     required String shippingType,
     required double shippingCost,
     required List<Map<String, dynamic>> products,
+    String? voucherCode,
   }) async {
     final response = await _apiClient.post(
       ApiConfig.transactions,
@@ -76,6 +77,7 @@ class TransactionRepository {
         'shipping_type': shippingType,
         'shipping_cost': shippingCost,
         'products': products,
+        if (voucherCode != null) 'voucher_code': voucherCode,
       },
       headers: {'X-Idempotency-Key': IdempotencyKey.generate()},
     );

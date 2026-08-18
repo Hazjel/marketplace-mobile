@@ -114,4 +114,7 @@ class ApiConfig {
       '/store-balance-history/all/paginated';
   static const String withdrawal = '/withdrawal';
   static const String withdrawalPaginated = '/withdrawal/all/paginated';
+
+  // Voucher / redeem code
+  static const String voucherValidate = '/voucher/validate';
 }

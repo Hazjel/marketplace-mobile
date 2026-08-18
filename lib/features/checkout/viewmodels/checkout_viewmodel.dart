@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
+import 'package:blukios_marketplace/features/checkout/models/voucher_model.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
@@ -17,6 +19,9 @@ class CheckoutData {
   final String? shippingError;
   final bool isSubmitting;
   final String? submitError;
+  final VoucherModel? appliedVoucher;
+  final bool isValidatingVoucher;
+  final String? voucherError;
 
   const CheckoutData({
     required this.group,
@@ -29,12 +34,17 @@ class CheckoutData {
     this.shippingError,
     this.isSubmitting = false,
     this.submitError,
+    this.appliedVoucher,
+    this.isValidatingVoucher = false,
+    this.voucherError,
   });
 
   double get subtotal => group.subtotal;
   double get tax => (subtotal * 0.11).roundToDouble();
   double get shippingCost => selectedCourier?.shippingCostNet ?? 0;
-  double get grandTotal => subtotal + tax + shippingCost;
+  double get discountAmount => appliedVoucher?.discountAmount ?? 0;
+  double get grandTotal =>
+      (subtotal + tax + shippingCost - discountAmount).clamp(0, double.infinity);
 
   CheckoutData copyWith({
     List<AddressModel>? savedAddresses,
@@ -49,6 +59,11 @@ class CheckoutData {
     bool? isSubmitting,
     String? submitError,
     bool clearSubmitError = false,
+    VoucherModel? appliedVoucher,
+    bool clearAppliedVoucher = false,
+    bool? isValidatingVoucher,
+    String? voucherError,
+    bool clearVoucherError = false,
   }) {
     return CheckoutData(
       group: group,
@@ -64,6 +79,11 @@ class CheckoutData {
           clearShippingError ? null : (shippingError ?? this.shippingError),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       submitError: clearSubmitError ? null : (submitError ?? this.submitError),
+      appliedVoucher:
+          clearAppliedVoucher ? null : (appliedVoucher ?? this.appliedVoucher),
+      isValidatingVoucher: isValidatingVoucher ?? this.isValidatingVoucher,
+      voucherError:
+          clearVoucherError ? null : (voucherError ?? this.voucherError),
     );
   }
 }
@@ -170,6 +190,44 @@ class CheckoutNotifier
     state = state.copyWith(selectedCourier: courier);
   }
 
+  /// Preview-validates a voucher code against this checkout's store +
+  /// subtotal. Only sets [CheckoutData.appliedVoucher] on success — the
+  /// backend re-validates everything again at [submit] time, since a
+  /// validate-then-checkout race is possible (e.g. usage limit exhausted
+  /// in between); if that happens the order still goes through, just
+  /// without the discount, rather than failing checkout outright.
+  Future<void> applyVoucherCode(String code) async {
+    if (code.trim().isEmpty) return;
+
+    state = state.copyWith(
+      isValidatingVoucher: true,
+      clearVoucherError: true,
+    );
+
+    try {
+      final voucher = await ref.read(voucherRepositoryProvider).validateVoucher(
+            code: code.trim(),
+            storeId: state.group.storeId,
+            subtotal: state.subtotal,
+          );
+      if (_disposed) return;
+      state = state.copyWith(
+        appliedVoucher: voucher,
+        isValidatingVoucher: false,
+      );
+    } catch (e) {
+      if (_disposed) return;
+      state = state.copyWith(
+        isValidatingVoucher: false,
+        voucherError: e is ApiException ? e.message : 'Gagal memeriksa voucher',
+      );
+    }
+  }
+
+  void removeVoucher() {
+    state = state.copyWith(clearAppliedVoucher: true, clearVoucherError: true);
+  }
+
   /// Returns the created transaction on success, or null on failure
   /// (with [CheckoutData.submitError] populated).
   Future<TransactionModel?> submit({required String buyerId}) async {
@@ -205,6 +263,7 @@ class CheckoutNotifier
                     .map((item) =>
                         {'product_id': item.productId, 'qty': item.quantity})
                     .toList(),
+                voucherCode: state.appliedVoucher?.code,
               );
       if (_disposed) return null;
       state = state.copyWith(isSubmitting: false);

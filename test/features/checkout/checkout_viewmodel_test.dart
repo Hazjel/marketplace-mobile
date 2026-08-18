@@ -2,9 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
+import 'package:blukios_marketplace/features/checkout/data/voucher_repository.dart';
+import 'package:blukios_marketplace/features/checkout/models/voucher_model.dart';
 import 'package:blukios_marketplace/features/checkout/viewmodels/checkout_viewmodel.dart';
 import 'package:blukios_marketplace/features/shipment/data/shipment_repository.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
@@ -16,6 +19,8 @@ class MockAddressRepository extends Mock implements AddressRepository {}
 class MockShipmentRepository extends Mock implements ShipmentRepository {}
 
 class MockTransactionRepository extends Mock implements TransactionRepository {}
+
+class MockVoucherRepository extends Mock implements VoucherRepository {}
 
 AddressModel _address({String id = 'addr-1', bool isPrimary = false, String cityId = 'city-1'}) {
   return AddressModel(
@@ -67,6 +72,7 @@ void main() {
   late MockAddressRepository addressRepository;
   late MockShipmentRepository shipmentRepository;
   late MockTransactionRepository transactionRepository;
+  late MockVoucherRepository voucherRepository;
   late ProviderContainer container;
   late CartGroupModel testGroup;
 
@@ -74,12 +80,14 @@ void main() {
     addressRepository = MockAddressRepository();
     shipmentRepository = MockShipmentRepository();
     transactionRepository = MockTransactionRepository();
+    voucherRepository = MockVoucherRepository();
     testGroup = _group();
     container = ProviderContainer(
       overrides: [
         addressRepositoryProvider.overrideWithValue(addressRepository),
         shipmentRepositoryProvider.overrideWithValue(shipmentRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
+        voucherRepositoryProvider.overrideWithValue(voucherRepository),
       ],
     );
   });
@@ -234,6 +242,120 @@ void main() {
       expect(result, transaction);
       expect(container.read(checkoutProvider(testGroup)).isSubmitting, isFalse);
       expect(container.read(checkoutProvider(testGroup)).submitError, isNull);
+    });
+
+    test('passes the applied voucher code through to the repository', () async {
+      when(() => addressRepository.getAddresses()).thenAnswer((_) async => [_address()]);
+      await container.read(checkoutProvider(testGroup).notifier).loadSavedAddresses();
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      notifier.selectCourier(
+        CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne'),
+      );
+      when(() => voucherRepository.validateVoucher(
+            code: any(named: 'code'),
+            storeId: any(named: 'storeId'),
+            subtotal: any(named: 'subtotal'),
+          )).thenAnswer((_) async => const VoucherModel(
+            voucherId: 'v1',
+            code: 'HEMAT10',
+            discountAmount: 2000,
+          ));
+      await notifier.applyVoucherCode('hemat10');
+
+      final transaction = _transaction();
+      when(() => transactionRepository.createTransaction(
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+            voucherCode: any(named: 'voucherCode'),
+          )).thenAnswer((_) async => transaction);
+
+      await notifier.submit(buyerId: 'buyer-1');
+
+      verify(() => transactionRepository.createTransaction(
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+            voucherCode: 'HEMAT10',
+          )).called(1);
+    });
+  });
+
+  group('applyVoucherCode', () {
+    test('sets appliedVoucher and reduces grandTotal on success', () async {
+      when(() => voucherRepository.validateVoucher(
+            code: any(named: 'code'),
+            storeId: any(named: 'storeId'),
+            subtotal: any(named: 'subtotal'),
+          )).thenAnswer((_) async => const VoucherModel(
+            voucherId: 'v1',
+            code: 'HEMAT10',
+            discountAmount: 2000,
+          ));
+
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      final before = container.read(checkoutProvider(testGroup)).grandTotal;
+      await notifier.applyVoucherCode('HEMAT10');
+
+      final state = container.read(checkoutProvider(testGroup));
+      expect(state.appliedVoucher?.code, 'HEMAT10');
+      expect(state.isValidatingVoucher, isFalse);
+      expect(state.voucherError, isNull);
+      expect(state.grandTotal, before - 2000);
+    });
+
+    test('surfaces the backend message and does not apply on failure', () async {
+      when(() => voucherRepository.validateVoucher(
+            code: any(named: 'code'),
+            storeId: any(named: 'storeId'),
+            subtotal: any(named: 'subtotal'),
+          )).thenThrow(ApiException(message: 'Kode voucher tidak ditemukan'));
+
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      await notifier.applyVoucherCode('SALAH');
+
+      final state = container.read(checkoutProvider(testGroup));
+      expect(state.appliedVoucher, isNull);
+      expect(state.voucherError, 'Kode voucher tidak ditemukan');
+    });
+
+    test('removeVoucher clears the applied voucher and restores grandTotal', () async {
+      when(() => voucherRepository.validateVoucher(
+            code: any(named: 'code'),
+            storeId: any(named: 'storeId'),
+            subtotal: any(named: 'subtotal'),
+          )).thenAnswer((_) async => const VoucherModel(
+            voucherId: 'v1',
+            code: 'HEMAT10',
+            discountAmount: 2000,
+          ));
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      await notifier.applyVoucherCode('HEMAT10');
+      final withDiscount = container.read(checkoutProvider(testGroup)).grandTotal;
+
+      notifier.removeVoucher();
+
+      final state = container.read(checkoutProvider(testGroup));
+      expect(state.appliedVoucher, isNull);
+      expect(state.grandTotal, withDiscount + 2000);
     });
   });
 }

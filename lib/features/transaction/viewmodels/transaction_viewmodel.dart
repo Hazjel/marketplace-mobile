@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/features/chat/viewmodels/chat_viewmodel.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
 class TransactionData {
@@ -29,6 +30,11 @@ class TransactionData {
 }
 
 class TransactionNotifier extends Notifier<TransactionData> {
+  /// Transaction ids this notifier currently has a live `transaction.{id}`
+  /// subscription open for — only non-terminal orders, so a completed/failed
+  /// order doesn't keep a channel open forever.
+  final Set<String> _subscribedIds = {};
+
   @override
   TransactionData build() => const TransactionData();
 
@@ -39,9 +45,49 @@ class TransactionNotifier extends Notifier<TransactionData> {
       final transactions =
           await ref.read(transactionRepositoryProvider).getTransactions();
       state = state.copyWith(transactions: transactions, isLoading: false);
+      _syncRealtimeSubscriptions();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  /// Subscribes to every non-terminal transaction's status channel and
+  /// unsubscribes any that are no longer in the list or just went terminal
+  /// (e.g. this same event marked one `completed`). Cheap to call after
+  /// every state change — it only does work when the id set actually moved.
+  void _syncRealtimeSubscriptions() {
+    final reverb = ref.read(reverbServiceProvider);
+    final wantedIds = state.transactions
+        .where((t) => !t.isTerminal)
+        .map((t) => t.id)
+        .toSet();
+
+    for (final id in _subscribedIds.difference(wantedIds)) {
+      reverb.unsubscribeFromChannel('transaction.$id');
+    }
+    for (final id in wantedIds.difference(_subscribedIds)) {
+      reverb.subscribeToChannel(
+        'transaction.$id',
+        onEvent: (data) => _handleStatusEvent(id, data),
+      );
+    }
+    _subscribedIds
+      ..clear()
+      ..addAll(wantedIds);
+  }
+
+  /// Broadcast payload shape (mirrors `TransactionStatusUpdated::broadcastWith`):
+  /// `{ "transaction": { ...TransactionResource } }`.
+  void _handleStatusEvent(String id, Map<String, dynamic> data) {
+    final payload = data['transaction'];
+    if (payload is! Map) return;
+
+    final updated = TransactionModel.fromJson(Map<String, dynamic>.from(payload));
+    state = state.copyWith(
+      transactions:
+          state.transactions.map((t) => t.id == id ? updated : t).toList(),
+    );
+    _syncRealtimeSubscriptions();
   }
 
   /// Re-checks payment status against Midtrans for one transaction and
@@ -54,6 +100,7 @@ class TransactionNotifier extends Notifier<TransactionData> {
         transactions:
             state.transactions.map((t) => t.id == id ? updated : t).toList(),
       );
+      _syncRealtimeSubscriptions();
       return null;
     } catch (e) {
       return e.toString();
@@ -85,6 +132,7 @@ class TransactionNotifier extends Notifier<TransactionData> {
         transactions:
             state.transactions.map((t) => t.id == id ? updated : t).toList(),
       );
+      _syncRealtimeSubscriptions();
       AnalyticsService.logEvent('order_completed', parameters: {'transaction_id': id});
       return null;
     } catch (e) {

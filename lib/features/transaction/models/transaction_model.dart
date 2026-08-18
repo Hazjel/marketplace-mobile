@@ -17,6 +17,9 @@ class TransactionModel {
   final String deliveryStatus;
   final double tax;
   final double grandTotal;
+  final String? voucherId;
+  final String? voucherCode;
+  final double discountAmount;
   final String paymentStatus;
   final String? snapToken;
   final String? createdAt;
@@ -46,6 +49,9 @@ class TransactionModel {
     required this.deliveryStatus,
     required this.tax,
     required this.grandTotal,
+    this.voucherId,
+    this.voucherCode,
+    this.discountAmount = 0,
     required this.paymentStatus,
     this.snapToken,
     this.createdAt,
@@ -74,6 +80,9 @@ class TransactionModel {
       deliveryStatus: json['delivery_status'] ?? 'pending',
       tax: (json['tax'] ?? 0).toDouble(),
       grandTotal: (json['grand_total'] ?? 0).toDouble(),
+      voucherId: json['voucher_id']?.toString(),
+      voucherCode: json['voucher_code'],
+      discountAmount: (json['discount_amount'] ?? 0).toDouble(),
       paymentStatus: json['payment_status'] ?? 'pending',
       snapToken: json['snap_token'],
       createdAt: json['created_at'],
@@ -111,6 +120,9 @@ class TransactionModel {
       deliveryStatus: deliveryStatus,
       tax: tax,
       grandTotal: grandTotal,
+      voucherId: voucherId,
+      voucherCode: voucherCode,
+      discountAmount: discountAmount,
       paymentStatus: paymentStatus,
       snapToken: snapToken,
       createdAt: createdAt,
@@ -135,6 +147,12 @@ class TransactionModel {
         return paymentStatus;
     }
   }
+
+  /// No further status change is expected — safe to stop listening for
+  /// live updates on this order.
+  bool get isTerminal =>
+      deliveryStatus == 'completed' ||
+      const ['failed', 'cancelled', 'expired'].contains(paymentStatus);
 
   String get deliveryStatusLabel {
     switch (deliveryStatus) {

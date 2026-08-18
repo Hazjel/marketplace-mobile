@@ -3,6 +3,7 @@ import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
 import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
+import 'package:blukios_marketplace/features/checkout/data/voucher_repository.dart';
 import 'package:blukios_marketplace/features/home/data/product_repository.dart';
 import 'package:blukios_marketplace/features/review/data/review_repository.dart';
 import 'package:blukios_marketplace/features/seller/dashboard/data/seller_dashboard_repository.dart';
@@ -34,6 +35,10 @@ final cartRepositoryProvider = Provider<CartRepository>(
 
 final transactionRepositoryProvider = Provider<TransactionRepository>(
   (ref) => TransactionRepository(ref.watch(apiClientProvider)),
+);
+
+final voucherRepositoryProvider = Provider<VoucherRepository>(
+  (ref) => VoucherRepository(ref.watch(apiClientProvider)),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(

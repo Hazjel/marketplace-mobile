@@ -29,6 +29,13 @@ class ReverbService {
   String? _userId;
   void Function(MessageModel)? _onMessage;
 
+  /// Additional private channels subscribed on this same socket — e.g.
+  /// `transaction.{id}` for live status updates. Pusher protocol allows
+  /// multiple `pusher:subscribe` frames per connection, so this rides the
+  /// one socket already open for chat rather than opening a second one.
+  /// Keyed by channel name; re-subscribed automatically on (re)connect.
+  final Map<String, void Function(Map<String, dynamic>)> _extraChannels = {};
+
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   bool _disposed = false;
@@ -93,6 +100,9 @@ class ReverbService {
           _socketId = payload is Map ? payload['socket_id']?.toString() : null;
           _reconnectAttempts = 0;
           await _subscribeToOwnChannel();
+          for (final channelName in _extraChannels.keys) {
+            await _authAndSubscribe(channelName);
+          }
           break;
 
         case 'pusher:ping':
@@ -104,10 +114,21 @@ class ReverbService {
           break;
 
         default:
-          // No broadcastAs() on the PHP event, so the wire name is the
+          // No broadcastAs() on the PHP events, so the wire name is the
           // fully-qualified class name.
           if (event.contains('MessageSent')) {
             _handleMessageEvent(data);
+            break;
+          }
+
+          final channelName = frame['channel'] as String?;
+          final handler =
+              channelName != null ? _extraChannels[channelName] : null;
+          if (handler != null) {
+            final payload = data is String ? jsonDecode(data) : data;
+            if (payload is Map) {
+              handler(Map<String, dynamic>.from(payload));
+            }
           }
       }
     } catch (e) {
@@ -128,14 +149,44 @@ class ReverbService {
     );
   }
 
-  /// Private channels require a server-signed auth token bound to this
-  /// socket id, obtained from Laravel's broadcasting auth endpoint.
   Future<void> _subscribeToOwnChannel() async {
     final userId = _userId;
-    final socketId = _socketId;
-    if (userId == null || socketId == null) return;
+    if (userId == null) return;
+    await _authAndSubscribe('private-chat.$userId');
+  }
 
-    final channelName = 'private-chat.$userId';
+  /// Subscribes to an arbitrary additional private channel on this same
+  /// socket (e.g. `transaction.{id}`), independent of the chat channel.
+  /// [onEvent] receives the decoded payload of whatever event the channel
+  /// broadcasts — callers key their own routing off its shape since a
+  /// feature channel here only ever carries one event type.
+  ///
+  /// Safe to call before the socket has connected: the subscription is
+  /// deferred and sent once `pusher:connection_established` arrives (and
+  /// re-sent automatically on reconnect).
+  Future<void> subscribeToChannel(
+    String channelName, {
+    required void Function(Map<String, dynamic> data) onEvent,
+  }) async {
+    _extraChannels[channelName] = onEvent;
+    if (_socketId != null) {
+      await _authAndSubscribe(channelName);
+    }
+  }
+
+  void unsubscribeFromChannel(String channelName) {
+    if (_extraChannels.remove(channelName) == null) return;
+    _send({
+      'event': 'pusher:unsubscribe',
+      'data': {'channel': channelName},
+    });
+  }
+
+  /// Shared by the chat channel and any [subscribeToChannel] caller: private
+  /// channels require a server-signed auth token bound to this socket id.
+  Future<void> _authAndSubscribe(String channelName) async {
+    final socketId = _socketId;
+    if (socketId == null) return;
 
     try {
       final response = await _apiClient.post(
@@ -154,7 +205,7 @@ class ReverbService {
         'data': {'channel': channelName, 'auth': auth},
       });
     } catch (e) {
-      debugPrint('Reverb channel auth failed: $e');
+      debugPrint('Reverb channel auth failed for $channelName: $e');
     }
   }
 
@@ -195,6 +246,7 @@ class ReverbService {
     _socketId = null;
     _userId = null;
     _onMessage = null;
+    _extraChannels.clear();
     _reconnectAttempts = 0;
   }
 }

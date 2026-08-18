@@ -206,11 +206,31 @@ class _TransactionCard extends StatelessWidget {
             DateFormatter.format(trx.createdAt),
             style: AppTheme.labelSm.copyWith(color: muted),
           ),
+          if (trx.paymentStatus == 'paid') ...[
+            const SizedBox(height: AppTheme.spacingMD),
+            _DeliveryStepper(status: trx.deliveryStatus),
+          ],
           const SizedBox(height: AppTheme.spacingMD),
           Divider(
             height: 1,
             color: isDark ? AppTheme.darkBorder : AppTheme.border,
           ),
+          if (trx.discountAmount > 0) ...[
+            const SizedBox(height: AppTheme.spacingSM),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Diskon Voucher${trx.voucherCode != null ? ' (${trx.voucherCode})' : ''}',
+                  style: AppTheme.labelSm.copyWith(color: muted),
+                ),
+                Text(
+                  '-${CurrencyFormatter.formatRupiah(trx.discountAmount)}',
+                  style: AppTheme.labelSm.copyWith(color: const Color(0xFF16A34A)),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppTheme.spacingMD),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -268,6 +288,62 @@ class _TransactionCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Horizontal pending → processing → delivering → completed timeline.
+/// Reflects live updates arriving over Reverb without the user having to
+/// pull to refresh — the current step just moves when a new event lands.
+class _DeliveryStepper extends StatelessWidget {
+  static const _steps = ['pending', 'processing', 'delivering', 'completed'];
+  static const _labels = ['Menunggu', 'Diproses', 'Dikirim', 'Selesai'];
+
+  final String status;
+
+  const _DeliveryStepper({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentIndex = _steps.indexOf(status);
+    final activeColor = isDark ? AppTheme.darkPrimary : AppTheme.primary;
+    final inactiveColor = isDark ? AppTheme.darkBorder : AppTheme.border;
+    final mutedText = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Row(
+      children: [
+        for (var i = 0; i < _steps.length; i++) ...[
+          if (i > 0)
+            Expanded(
+              child: Container(
+                height: 2,
+                color: i <= currentIndex ? activeColor : inactiveColor,
+              ),
+            ),
+          Column(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i <= currentIndex ? activeColor : inactiveColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _labels[i],
+                style: AppTheme.labelSm.copyWith(
+                  color: i <= currentIndex ? activeColor : mutedText,
+                  fontWeight: i == currentIndex ? FontWeight.w700 : FontWeight.normal,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

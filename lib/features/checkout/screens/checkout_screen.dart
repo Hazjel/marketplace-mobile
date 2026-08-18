@@ -21,6 +21,14 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  final _voucherController = TextEditingController();
+
+  @override
+  void dispose() {
+    _voucherController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -202,12 +210,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             const SizedBox(height: 12),
 
             _buildSectionCard(
+              title: 'Kode Voucher',
+              child: _buildVoucherSection(context, viewModel, notifier),
+            ),
+            const SizedBox(height: 12),
+
+            _buildSectionCard(
               title: 'Ringkasan Belanja',
               child: Column(
                 children: [
                   _buildSummaryRow('Subtotal', viewModel.subtotal),
                   _buildSummaryRow('Ongkos Kirim', viewModel.shippingCost),
                   _buildSummaryRow('PPN 11%', viewModel.tax),
+                  if (viewModel.appliedVoucher != null)
+                    _buildSummaryRow(
+                      'Diskon Voucher',
+                      viewModel.discountAmount,
+                      isDiscount: true,
+                    ),
                   const Divider(),
                   _buildSummaryRow('Total Tagihan', viewModel.grandTotal, isBold: true),
                 ],
@@ -271,7 +291,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, double value, {bool isBold = false}) {
+  Widget _buildSummaryRow(String label, double value, {bool isBold = false, bool isDiscount = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -279,15 +299,104 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         children: [
           Text(label, style: TextStyle(fontSize: isBold ? 14 : 13, fontWeight: isBold ? FontWeight.w700 : FontWeight.normal)),
           Text(
-            CurrencyFormatter.formatRupiah(value),
+            '${isDiscount ? '-' : ''}${CurrencyFormatter.formatRupiah(value)}',
             style: TextStyle(
               fontSize: isBold ? 15 : 13,
               fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-              color: isBold ? const Color(0xFF2563EB) : null,
+              color: isDiscount
+                  ? const Color(0xFF16A34A)
+                  : (isBold ? const Color(0xFF2563EB) : null),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVoucherSection(
+    BuildContext context,
+    CheckoutData viewModel,
+    CheckoutNotifier notifier,
+  ) {
+    if (viewModel.appliedVoucher != null) {
+      final voucher = viewModel.appliedVoucher!;
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          border: Border.all(color: const Color(0xFF16A34A)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const AppIcon(AppIcons.check, size: AppIconSize.md, color: Color(0xFF16A34A)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(voucher.code, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Hemat ${CurrencyFormatter.formatRupiah(voucher.discountAmount)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A)),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                notifier.removeVoucher();
+                _voucherController.clear();
+              },
+              child: const Text('Hapus'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _voucherController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: 'Masukkan kode voucher',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 40,
+              child: ElevatedButton(
+                onPressed: viewModel.isValidatingVoucher
+                    ? null
+                    : () => notifier.applyVoucherCode(_voucherController.text),
+                child: viewModel.isValidatingVoucher
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Terapkan'),
+              ),
+            ),
+          ],
+        ),
+        if (viewModel.voucherError != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            viewModel.voucherError!,
+            style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
+          ),
+        ],
+      ],
     );
   }
 
