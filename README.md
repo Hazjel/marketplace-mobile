@@ -1,4 +1,4 @@
-# Blukios Marketplace - Flutter Mobile App
+# Blukios Marketplace — Flutter Mobile App
 
 Aplikasi mobile marketplace berbasis Flutter yang terintegrasi dengan Laravel 12 API (api-blue).
 
