@@ -37,12 +37,20 @@ class _BlukiosAppState extends ConsumerState<BlukiosApp> {
     });
 
     // A push notification tap (foreground, background, or cold-start) lands
-    // here regardless of which screen the app happens to open on. No
-    // per-transaction deep link yet (backend doesn't send one) — routing to
-    // the list is enough since it already shows live status via Reverb.
-    NotificationService.onNotificationTap.listen((_) {
+    // here regardless of which screen the app happens to open on. Routes by
+    // the backend's `type` field (see SendPushOnMessageSent /
+    // SendPushOnTransactionStatusUpdated) — chat opens the sender's thread
+    // directly, everything else falls back to the transaction list (no
+    // per-transaction deep link yet, but it already shows live status via
+    // Reverb so landing there is still useful).
+    NotificationService.onNotificationTap.listen((data) {
       final router = ref.read(routerProvider);
-      router.go(AppRoutes.transactions);
+      final senderId = data['sender_id'] as String?;
+      if (data['type'] == 'chat' && senderId != null) {
+        router.go(AppRoutes.chatThreadPath(senderId));
+      } else {
+        router.go(AppRoutes.transactions);
+      }
     });
   }
 

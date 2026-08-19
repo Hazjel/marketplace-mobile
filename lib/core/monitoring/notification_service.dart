@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -71,7 +72,14 @@ class NotificationService {
         onDidReceiveNotificationResponse: (response) {
           final payload = response.payload;
           if (payload == null || payload.isEmpty) return;
-          _tapController.add({'transaction_id': payload});
+          try {
+            final decoded = jsonDecode(payload);
+            if (decoded is Map) {
+              _tapController.add(Map<String, dynamic>.from(decoded));
+            }
+          } catch (e) {
+            debugPrint('NotificationService: failed to decode tap payload: $e');
+          }
         },
       );
 
@@ -118,7 +126,10 @@ class NotificationService {
           priority: Priority.high,
         ),
       ),
-      payload: message.data['transaction_id'] as String?,
+      // Whole data payload, not just one field — the tap handler above
+      // needs `type` to know whether this is a chat or transaction push
+      // before it can decide which id field is even relevant.
+      payload: message.data.isEmpty ? null : jsonEncode(message.data),
     );
   }
 
