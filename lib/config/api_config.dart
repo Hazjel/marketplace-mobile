@@ -46,6 +46,7 @@ class ApiConfig {
 
   // Search & filters (3a)
   static const String productSearch = '/product/all/paginated';
+  static const String searchSuggestions = '/search/suggestions';
 
   // Category browse (3b)
   static const String categoriesPaginated = '/product-category/all/paginated';

@@ -1,10 +1,14 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/pagination/paged_notifier.dart';
+import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
+import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/search/models/search_filters.dart';
+import 'package:blukios_marketplace/features/search/models/search_suggestions_model.dart';
 import 'package:blukios_marketplace/features/search/viewmodels/search_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
@@ -29,6 +33,9 @@ class SearchScreen extends ConsumerStatefulWidget {
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
+  final _searchFocusNode = FocusNode();
+
+  bool _dropdownVisible = false;
 
   @override
   void initState() {
@@ -39,6 +46,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     _scrollController.addListener(_onScroll);
+    _searchFocusNode.addListener(_onFocusChanged);
 
     // Trigger initial search after build
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,6 +62,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _searchFocusNode.removeListener(_onFocusChanged);
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -64,14 +74,68 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
   }
 
+  void _onFocusChanged() {
+    if (_searchFocusNode.hasFocus) {
+      // Refresh history in case it changed elsewhere (e.g. cleared on
+      // another screen instance) while this one was mounted.
+      ref.read(searchHistoryProvider.notifier).refresh();
+      setState(() => _dropdownVisible = true);
+    } else {
+      _dismissDropdown();
+    }
+  }
+
+  void _dismissDropdown() {
+    if (!_dropdownVisible) return;
+    setState(() => _dropdownVisible = false);
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() {}); // refresh suffix icon / dropdown content
+    ref.read(searchSuggestionsProvider.notifier).onQueryChanged(value);
+  }
+
   void _submitSearch() {
     final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      ref.read(searchHistoryProvider.notifier).save(query);
+    }
     final current = ref.read(searchFilterProvider);
     ref.read(searchFilterProvider.notifier).updateFilters(
       query.isEmpty
           ? current.copyWith(clearSearch: true)
           : current.copyWith(search: query),
     );
+    ref.read(searchSuggestionsProvider.notifier).reset();
+    _searchFocusNode.unfocus();
+  }
+
+  void _selectHistoryQuery(String query) {
+    _searchController.text = query;
+    _submitSearch();
+  }
+
+  void _selectCategory(SearchCategorySuggestion category) {
+    _searchFocusNode.unfocus();
+    ref.read(searchSuggestionsProvider.notifier).reset();
+    context.push(
+      AppRoutes.search,
+      extra: {'categoryId': category.id, 'categoryName': category.name},
+    );
+  }
+
+  void _selectProduct(ProductModel product) {
+    ref.read(searchHistoryProvider.notifier).save(product.name);
+    _searchFocusNode.unfocus();
+    ref.read(searchSuggestionsProvider.notifier).reset();
+    context.push(AppRoutes.productDetailPath(product.slug));
+  }
+
+  void _selectStore(SearchStoreSuggestion store) {
+    ref.read(searchHistoryProvider.notifier).save(store.name);
+    _searchFocusNode.unfocus();
+    ref.read(searchSuggestionsProvider.notifier).reset();
+    context.push(AppRoutes.storeDetailPath(store.username));
   }
 
   void _showFilterSheet() {
@@ -117,7 +181,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ],
       ),
-      body: _buildBody(searchState, filters),
+      body: Stack(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _searchFocusNode.unfocus(),
+            child: _buildBody(searchState, filters),
+          ),
+          if (_dropdownVisible) _buildSuggestionsDropdown(),
+        ],
+      ),
     );
   }
 
@@ -127,8 +200,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       margin: const EdgeInsets.only(right: 4),
       child: TextField(
         controller: _searchController,
+        focusNode: _searchFocusNode,
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => _submitSearch(),
+        onChanged: _onQueryChanged,
         decoration: InputDecoration(
           hintText: widget.initialCategoryName != null
               ? 'Cari di ${widget.initialCategoryName}...'
@@ -154,6 +229,184 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         style: const TextStyle(fontSize: 14),
       ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────
+  // TYPEAHEAD / RECENT SEARCH DROPDOWN
+  // ─────────────────────────────────────────────────
+
+  Widget _buildSuggestionsDropdown() {
+    final query = _searchController.text.trim();
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: GestureDetector(
+        // Absorb taps on the dropdown itself so they don't fall through to
+        // the "tap outside to dismiss" detector on the body below it.
+        onTap: () {},
+        child: Material(
+          elevation: 4,
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: query.length < 2
+                ? _buildHistorySection()
+                : _buildSuggestionsSection(query),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistorySection() {
+    final history = ref.watch(searchHistoryProvider);
+
+    if (history.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'Belum ada pencarian terbaru',
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'PENCARIAN TERAKHIR',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              TextButton(
+                onPressed: () => ref.read(searchHistoryProvider.notifier).clear(),
+                child: const Text('Hapus Semua', style: TextStyle(fontSize: 12, color: AppTheme.error)),
+              ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            itemCount: history.length,
+            itemBuilder: (context, index) {
+              final item = history[index];
+              return ListTile(
+                dense: true,
+                leading: const AppIcon(AppIcons.search, size: AppIconSize.sm),
+                title: Text(item, style: const TextStyle(fontSize: 14)),
+                trailing: IconButton(
+                  icon: const AppIcon(AppIcons.close, size: AppIconSize.sm, semanticsLabel: 'Hapus'),
+                  onPressed: () => ref.read(searchHistoryProvider.notifier).removeAt(index),
+                ),
+                onTap: () => _selectHistoryQuery(item),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuggestionsSection(String query) {
+    final suggestionsState = ref.watch(searchSuggestionsProvider);
+
+    return suggestionsState.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (suggestions) {
+        if (suggestions.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(
+              child: Text(
+                'Tidak ada saran ditemukan',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+            ),
+          );
+        }
+
+        return ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          children: [
+            for (final category in suggestions.categories)
+              ListTile(
+                dense: true,
+                leading: const AppIcon(AppIcons.category, size: AppIconSize.sm),
+                title: Text(category.name, style: const TextStyle(fontSize: 14)),
+                trailing: const Text('Kategori', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                onTap: () => _selectCategory(category),
+              ),
+            for (final product in suggestions.products)
+              ListTile(
+                dense: true,
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: product.thumbnail != null
+                        ? CachedNetworkImage(
+                            imageUrl: product.thumbnail!,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(color: AppTheme.border),
+                          )
+                        : Container(color: AppTheme.border),
+                  ),
+                ),
+                title: Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                subtitle: Text(
+                  'Rp ${CurrencyFormatter.formatRupiah(product.price)}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                ),
+                onTap: () => _selectProduct(product),
+              ),
+            for (final store in suggestions.stores)
+              ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppTheme.border,
+                  backgroundImage: store.logo != null ? CachedNetworkImageProvider(store.logo!) : null,
+                  child: store.logo == null
+                      ? const AppIcon(AppIcons.store, size: AppIconSize.sm)
+                      : null,
+                ),
+                title: Text(store.name, style: const TextStyle(fontSize: 14)),
+                trailing: const Text('Toko', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                onTap: () => _selectStore(store),
+              ),
+          ],
+        );
+      },
     );
   }
 

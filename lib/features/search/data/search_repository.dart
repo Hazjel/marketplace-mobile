@@ -3,6 +3,7 @@ import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/core/network/api_response.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/search/models/search_filters.dart';
+import 'package:blukios_marketplace/features/search/models/search_suggestions_model.dart';
 
 class SearchRepository {
   final ApiClient _apiClient;
@@ -30,5 +31,19 @@ class SearchRepository {
       response.data as Map<String, dynamic>,
       (json) => ProductModel.fromJson(json),
     );
+  }
+
+  /// Live typeahead suggestions (products/categories/stores) for the search
+  /// bar dropdown. Separate, lightweight endpoint from [searchProducts] —
+  /// meant to run on every debounced keystroke, mirrors the web app's
+  /// `getSearchSuggestions`.
+  Future<SearchSuggestions> getSuggestions(String query) async {
+    final response = await _apiClient.get(
+      ApiConfig.searchSuggestions,
+      queryParameters: {'q': query},
+    );
+    final data = response.data['data'];
+    if (data is! Map<String, dynamic>) return SearchSuggestions.empty;
+    return SearchSuggestions.fromJson(data);
   }
 }
