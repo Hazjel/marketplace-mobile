@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
+import 'package:blukios_marketplace/features/recommendation/viewmodels/recommendation_viewmodel.dart';
 
 class ProductDetailData {
   final ProductModel? product;
@@ -50,6 +52,15 @@ class ProductDetailNotifier
           await ref.read(productRepositoryProvider).getProductBySlug(arg);
       if (_disposed) return;
       state = state.copyWith(product: product, isLoading: false);
+
+      // Recommendations & view tracking only make sense once the product's
+      // id is known — mirrors web's `fetchProduct` in ProductDetail.vue.
+      final userId = ref.read(authProvider).currentUser?.id;
+      ref.read(recommendationRepositoryProvider).trackView(
+            productId: product.id,
+            userId: userId,
+          );
+      ref.read(similarProductsProvider(product.id).notifier).load();
     } catch (e) {
       if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());

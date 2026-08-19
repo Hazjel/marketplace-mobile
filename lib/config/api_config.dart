@@ -125,4 +125,17 @@ class ApiConfig {
 
   // Push notifications — device token registration
   static const String deviceToken = '/device-token';
+
+  // Product recommendations — separate service, reachable at /recommend on
+  // the same host as the API (sibling to /api, not nested under it). Mirrors
+  // how `reverbHost`/`reverbUseTLS` derive from `baseUrl` above.
+  static String get recommendationBaseUrl =>
+      Uri.parse(baseUrl).replace(path: '/recommend').toString();
+  static String similarProducts(String productId) =>
+      '/product/$productId/similar';
+  static String personalizedForUser(String userId) => '/user/$userId';
+
+  // Product view tracking — feeds the recommendation model's training data.
+  // Already wired on the backend; just never called from mobile before.
+  static String productView(String id) => '/product/$id/view';
 }

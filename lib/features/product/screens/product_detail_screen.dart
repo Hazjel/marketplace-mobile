@@ -6,6 +6,8 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
+import 'package:blukios_marketplace/features/recommendation/viewmodels/recommendation_viewmodel.dart';
+import 'package:blukios_marketplace/features/recommendation/widgets/recommended_product_card.dart';
 import 'package:blukios_marketplace/features/review/models/review_model.dart';
 import 'package:blukios_marketplace/features/product/viewmodels/product_detail_viewmodel.dart';
 import 'package:blukios_marketplace/features/wishlist/viewmodels/wishlist_viewmodel.dart';
@@ -138,8 +140,62 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 ],
               ),
             ),
+            _SimilarProductsSection(productId: product.id),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Produk Serupa" — content-based recommendations for this product.
+/// Hidden entirely while loading or when the response comes back empty,
+/// matching web's `v-if="similarProducts.length"`.
+class _SimilarProductsSection extends ConsumerWidget {
+  final String productId;
+
+  const _SimilarProductsSection({required this.productId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final similar = ref.watch(similarProductsProvider(productId));
+    if (similar.products.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.spacingXL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spacingLG,
+              0,
+              AppTheme.spacingLG,
+              AppTheme.spacingSM,
+            ),
+            child: Text('Produk Serupa', style: AppTheme.titleLg),
+          ),
+          SizedBox(
+            height: 232,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLG),
+              itemCount: similar.products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spacingSM),
+              itemBuilder: (context, index) {
+                final product = similar.products[index];
+                return SizedBox(
+                  width: 148,
+                  child: RecommendedProductCard(
+                    product: product,
+                    onTap: () =>
+                        context.push(AppRoutes.productDetailPath(product.slug)),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

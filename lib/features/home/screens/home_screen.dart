@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/responsive.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
 import 'package:blukios_marketplace/features/home/models/category_model.dart';
 import 'package:blukios_marketplace/features/home/viewmodels/home_products_viewmodel.dart';
 import 'package:blukios_marketplace/features/home/viewmodels/home_viewmodel.dart';
+import 'package:blukios_marketplace/features/recommendation/viewmodels/recommendation_viewmodel.dart';
+import 'package:blukios_marketplace/features/recommendation/widgets/recommended_product_card.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/product_card.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -33,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(homeProductsProvider.notifier).loadFirstPage();
       // Cart drives the header badge, so it needs loading here too.
       ref.read(cartProvider.notifier).loadCart();
+      _loadPersonalizedRecommendations();
     });
   }
 
@@ -54,6 +58,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(homeProvider.notifier).loadData(),
       ref.read(homeProductsProvider.notifier).loadFirstPage(),
     ]);
+    _loadPersonalizedRecommendations();
+  }
+
+  /// Only meaningful for a logged-in user — a guest pseudo-id doesn't match
+  /// the collaborative model, and the backend has no notion of a "guest
+  /// user" for this endpoint the way it does for view tracking.
+  void _loadPersonalizedRecommendations() {
+    final userId = ref.read(authProvider).currentUser?.id;
+    if (userId == null) return;
+    ref.read(personalizedRecommendationsProvider(userId).notifier).load();
   }
 
   @override
@@ -90,6 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SliverToBoxAdapter(
                   child: _CategoryStrip(categories: viewModel.categories),
                 ),
+              const SliverToBoxAdapter(child: _PersonalizedRecommendationsSection()),
               const SliverToBoxAdapter(
                 child: _SectionHeader(title: 'Produk Terbaru'),
               ),
@@ -425,6 +440,54 @@ class _CategoryFallback extends StatelessWidget {
         size: AppIconSize.md,
         color: isDark ? AppTheme.darkPrimary : AppTheme.primary,
       ),
+    );
+  }
+}
+
+/// "Rekomendasi Buat Kamu" (collaborative) / "Sedang Trending" (fallback)
+/// section — only shown for a logged-in user (see [_HomeScreenState]'s
+/// [_loadPersonalizedRecommendations]), and hidden entirely while loading
+/// or when the response comes back empty.
+class _PersonalizedRecommendationsSection extends ConsumerWidget {
+  const _PersonalizedRecommendationsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userId = ref.watch(authProvider.select((s) => s.currentUser?.id));
+    if (userId == null) return const SizedBox.shrink();
+
+    final data = ref.watch(personalizedRecommendationsProvider(userId));
+    final recommendations = data.recommendations;
+    if (recommendations.products.isEmpty) return const SizedBox.shrink();
+
+    final title = recommendations.source == 'collaborative'
+        ? 'Rekomendasi Buat Kamu'
+        : 'Sedang Trending';
+
+    return Column(
+      children: [
+        _SectionHeader(title: title),
+        SizedBox(
+          height: 232,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLG),
+            itemCount: recommendations.products.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppTheme.spacingSM),
+            itemBuilder: (context, index) {
+              final product = recommendations.products[index];
+              return SizedBox(
+                width: 148,
+                child: RecommendedProductCard(
+                  product: product,
+                  onTap: () =>
+                      context.push(AppRoutes.productDetailPath(product.slug)),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
