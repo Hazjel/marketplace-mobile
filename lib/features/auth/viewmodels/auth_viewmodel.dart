@@ -48,25 +48,41 @@ class AuthNotifier extends Notifier<AuthData> {
       return;
     }
 
-    try {
-      final user = await ref.read(authRepositoryProvider).getProfile();
-      state = state.copyWith(state: AuthState.authenticated, currentUser: user);
-    } on ApiException catch (e) {
-      // Only a real auth rejection (invalid/expired/revoked token) should
-      // sign the user out. A network blip, timeout, or server hiccup on
-      // startup must NOT wipe an otherwise-valid saved session — that was
-      // forcing a full re-login on every flaky connection. Stay
-      // `unknown` so the router holds its redirect decision instead of
-      // bouncing to /login; the next successful check (retry, next
-      // launch, or a real API call's own 401) resolves it properly.
-      if (e.statusCode == 401) {
-        await SecureStorage.clearAll();
-        state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
+    // Only a real auth rejection (invalid/expired/revoked token) should sign
+    // the user out on the FIRST try — a network blip, timeout, or server
+    // hiccup on startup must not wipe an otherwise-valid saved session.
+    // But staying `unknown` with no bound on it was a real bug (reported
+    // live: app permanently stuck on the splash screen) — this call fires
+    // exactly once, from app.dart's initState, with nothing else ever
+    // re-triggering it, so a persistent non-401 failure meant `unknown`
+    // forever with zero recovery path short of the user never being able
+    // to open the app at all. Retry a few times with backoff to ride out a
+    // genuine blip, then fall back to unauthenticated — reaching the login
+    // screen and having to sign back in is a far better outcome than an
+    // app that never loads.
+    const maxAttempts = 3;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final user = await ref.read(authRepositoryProvider).getProfile();
+        state = state.copyWith(state: AuthState.authenticated, currentUser: user);
+        return;
+      } on ApiException catch (e) {
+        if (e.statusCode == 401) {
+          await SecureStorage.clearAll();
+          state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
+          return;
+        }
+        // Any other status (timeout, 5xx, offline) — fall through to retry.
+      } catch (_) {
+        // Non-API exception (e.g. JSON parsing) — also just retry.
       }
-    } catch (_) {
-      // Non-API exception (e.g. JSON parsing) — same "don't destroy a
-      // possibly-valid session over a transient failure" reasoning.
+
+      if (attempt < maxAttempts) {
+        await Future.delayed(Duration(milliseconds: 400 * attempt));
+      }
     }
+
+    state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
   }
 
   Future<bool> login(String email, String password) async {

@@ -87,9 +87,34 @@ void main() {
     });
 
     test(
-      'saved token + non-401 error (e.g. timeout) does NOT clear the '
-      'session or force unauthenticated — regression test for the '
-      'network-hiccup-shouldn\'t-log-out fix',
+      'saved token + a transient non-401 error that clears up on retry '
+      '-> authenticated, session never touched',
+      () async {
+        await SecureStorage.saveToken('a-valid-token');
+        var callCount = 0;
+        when(() => authRepository.getProfile()).thenAnswer((_) async {
+          callCount++;
+          if (callCount == 1) {
+            throw ApiException(message: 'Koneksi timeout, coba lagi');
+          }
+          return testUser;
+        });
+
+        await container.read(authProvider.notifier).checkAuthStatus();
+
+        final state = container.read(authProvider);
+        expect(state.state, AuthState.authenticated);
+        expect(state.currentUser, testUser);
+        expect(await SecureStorage.getToken(), 'a-valid-token');
+      },
+    );
+
+    test(
+      'saved token + persistent non-401 error (every attempt fails) -> '
+      'falls back to unauthenticated once retries are exhausted, but the '
+      'token itself is left alone (unlike the real-401 case above) — '
+      'regression test for the app getting permanently stuck on the splash '
+      'screen when startup happened to hit a lasting server/network issue',
       () async {
         await SecureStorage.saveToken('a-valid-token');
         when(() => authRepository.getProfile())
@@ -97,12 +122,10 @@ void main() {
 
         await container.read(authProvider.notifier).checkAuthStatus();
 
-        // Must NOT have been flipped to unauthenticated by a transient error.
-        expect(container.read(authProvider).state, isNot(AuthState.unauthenticated));
-        // The token must survive — a real bug this fix addressed was that
-        // ANY exception used to wipe it, forcing a full re-login on the
-        // next successful network attempt even though the session was
-        // never actually invalid.
+        expect(container.read(authProvider).state, AuthState.unauthenticated);
+        // Not wiped (unlike the 401 branch) — a later successful check
+        // (app relaunch once the network/server recovers) can still pick
+        // this same token back up rather than forcing a fresh login.
         expect(await SecureStorage.getToken(), 'a-valid-token');
       },
     );
