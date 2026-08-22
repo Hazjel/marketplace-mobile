@@ -147,10 +147,19 @@ class AppRoutes {
                   // than bouncing anywhere — so without this check the real
                   // home screen would render underneath for a moment before
                   // any redirect to /login fires. Show a splash instead.
-                  builder: (_, __) =>
-                      ref.read(authProvider).state == AuthState.unknown
-                          ? const SplashScreen()
-                          : const HomeScreen(),
+                  //
+                  // This MUST be a widget that watches the auth state, not
+                  // a `ref.read` in the builder itself. When validation
+                  // resolves to `authenticated` the user is already on the
+                  // right route, so nothing redirects and nothing
+                  // navigates — and this branch's navigator (kept alive by
+                  // StatefulShellRoute.indexedStack, which is the whole
+                  // point of indexedStack) keeps serving the page it built
+                  // on the very first frame. A `ref.read` here therefore
+                  // pinned the app to the splash screen forever on every
+                  // relaunch with a valid saved session. Watching instead
+                  // rebuilds the cached page in place.
+                  builder: (_, __) => const _HomeOrSplash(),
                 ),
               ],
             ),
@@ -372,6 +381,23 @@ class AppRoutes {
 
 /// Bridges Riverpod's auth state onto the [Listenable] GoRouter expects,
 /// so a login/logout re-runs the redirect.
+/// The home tab's content while the saved session is being validated.
+///
+/// Deliberately a `ConsumerWidget` watching [authProvider] rather than a
+/// check inside the route builder: the shell's home branch caches the page
+/// it first built, and resolving to `authenticated` triggers no navigation
+/// to replace it. Watching is what makes the swap happen in place.
+class _HomeOrSplash extends ConsumerWidget {
+  const _HomeOrSplash();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isResolving =
+        ref.watch(authProvider.select((a) => a.state == AuthState.unknown));
+    return isResolving ? const SplashScreen() : const HomeScreen();
+  }
+}
+
 class _AuthRefreshListenable extends ChangeNotifier {
   _AuthRefreshListenable(Ref ref) {
     ref.listen<AuthData>(
