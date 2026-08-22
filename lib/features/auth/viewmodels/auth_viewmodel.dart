@@ -87,8 +87,22 @@ class AuthNotifier extends Notifier<AuthData> {
         return;
       } on ApiException catch (e) {
         if (e.statusCode == 401) {
-          await SecureStorage.clearAll();
+          // Resolve the state BEFORE wiping. `SecureStorage.clearAll()`
+          // swallows errors but can still never *complete* (same hung
+          // platform-channel class of failure as the read above), and
+          // awaiting it first meant a stuck wipe left the state at
+          // `unknown` — i.e. the splash screen forever. This is the branch
+          // an expired/revoked saved token takes, so it's the one a
+          // long-idle install is most likely to hit. Ordering it this way
+          // means the UI is already unblocked no matter what the keystore
+          // does; the timeout then stops this method itself from hanging.
           state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
+          try {
+            await SecureStorage.clearAll().timeout(const Duration(seconds: 5));
+          } catch (_) {
+            // Wipe failed or stalled — the session is already treated as
+            // gone, and the next successful login overwrites the token.
+          }
           return;
         }
         // Any other status (timeout, 5xx, offline) — fall through to retry.
@@ -178,12 +192,24 @@ class AuthNotifier extends Notifier<AuthData> {
   Future<void> refreshAfterExternalLogin() => checkAuthStatus();
 
   Future<void> logout() async {
-    await ref.read(authRepositoryProvider).logout();
+    // Signing out is a local decision — it must not depend on the server
+    // (or the keystore) cooperating. Same reasoning as the 401 branch in
+    // checkAuthStatus: resolve the state first so the UI always moves, then
+    // make a bounded best effort to revoke the token server-side.
     state = state.copyWith(
       state: AuthState.unauthenticated,
       clearUser: true,
       clearError: true,
     );
+    try {
+      await ref
+          .read(authRepositoryProvider)
+          .logout()
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Offline, server down, or a stalled request — the local session is
+      // already gone either way.
+    }
   }
 }
 
