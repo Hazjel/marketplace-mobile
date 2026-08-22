@@ -42,7 +42,19 @@ class AuthNotifier extends Notifier<AuthData> {
   AuthData build() => const AuthData();
 
   Future<void> checkAuthStatus() async {
-    final token = await SecureStorage.getToken();
+    // `SecureStorage.getToken()` already degrades platform *errors* to
+    // `null` (see its own doc comment), but a hung platform-channel call
+    // (keystore deadlock, corrupted secure-storage backend on some devices)
+    // never throws at all — it just never completes, which left this whole
+    // method (and therefore `AuthState`) stuck at `unknown` forever even
+    // after the retry/fallback fix below. A hard timeout here guarantees
+    // this can never hang past a few seconds regardless of cause.
+    String? token;
+    try {
+      token = await SecureStorage.getToken().timeout(const Duration(seconds: 5));
+    } catch (_) {
+      token = null;
+    }
     if (token == null) {
       state = state.copyWith(state: AuthState.unauthenticated, clearUser: true);
       return;
@@ -63,7 +75,14 @@ class AuthNotifier extends Notifier<AuthData> {
     const maxAttempts = 3;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        final user = await ref.read(authRepositoryProvider).getProfile();
+        // `ApiClient`'s own connect/receive timeouts (30s) already bound a
+        // normal request, but they don't cover every failure mode (e.g. a
+        // response that starts streaming but never finishes) — a hard cap
+        // here means this attempt can never outlast ~10s regardless.
+        final user = await ref
+            .read(authRepositoryProvider)
+            .getProfile()
+            .timeout(const Duration(seconds: 10));
         state = state.copyWith(state: AuthState.authenticated, currentUser: user);
         return;
       } on ApiException catch (e) {
@@ -74,7 +93,8 @@ class AuthNotifier extends Notifier<AuthData> {
         }
         // Any other status (timeout, 5xx, offline) — fall through to retry.
       } catch (_) {
-        // Non-API exception (e.g. JSON parsing) — also just retry.
+        // Non-API exception (e.g. JSON parsing, our own .timeout()) — also
+        // just retry.
       }
 
       if (attempt < maxAttempts) {
