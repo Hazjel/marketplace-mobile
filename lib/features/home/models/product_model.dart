@@ -1,3 +1,4 @@
+import 'package:blukios_marketplace/core/utils/json.dart';
 import 'package:blukios_marketplace/features/review/models/review_model.dart';
 
 class ProductModel {
@@ -41,17 +42,19 @@ class ProductModel {
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
-      id: json['id'].toString(),
-      name: json['name'] ?? '',
-      slug: json['slug'] ?? '',
-      description: json['description'],
-      price: (json['price'] ?? 0) is int ? json['price'] : (json['price'] as num).toInt(),
-      stock: (json['stock'] ?? 0) is int ? json['stock'] : (json['stock'] as num).toInt(),
-      weight: (json['weight'] ?? 0).toDouble(),
-      condition: json['condition'] ?? 'new',
-      thumbnail: json['thumbnail'],
-      totalSold: (json['total_sold'] ?? 0) is int ? json['total_sold'] ?? 0 : (json['total_sold'] as num).toInt(),
-      store: json['store'] != null ? StoreMini.fromJson(json['store']) : null,
+      id: json.asString('id'),
+      name: json.asString('name'),
+      slug: json.asString('slug'),
+      description: json.asStringOrNull('description'),
+      price: json.asInt('price'),
+      stock: json.asInt('stock'),
+      weight: json.asDouble('weight'),
+      condition: json.asString('condition', 'new'),
+      thumbnail: json.asStringOrNull('thumbnail'),
+      totalSold: json.asInt('total_sold'),
+      store: json['store'] is Map<String, dynamic>
+          ? StoreMini.fromJson(json['store'] as Map<String, dynamic>)
+          : null,
       reviews: json['product_reviews'] is List
           ? (json['product_reviews'] as List)
               .whereType<Map<String, dynamic>>()
@@ -77,10 +80,10 @@ class StoreMini {
 
   factory StoreMini.fromJson(Map<String, dynamic> json) {
     return StoreMini(
-      id: json['id'].toString(),
-      name: json['name'] ?? '',
-      username: json['username']?.toString(),
-      logo: json['logo'],
+      id: json.asString('id'),
+      name: json.asString('name'),
+      username: json.asStringOrNull('username'),
+      logo: json.asStringOrNull('logo'),
     );
   }
 }
