@@ -36,22 +36,23 @@ AddressModel _address({String id = 'addr-1', bool isPrimary = false, String city
   );
 }
 
-CartGroupModel _group({String storeAddressId = 'shop-city-1'}) {
+CartGroupModel _group({String storeAddressId = 'shop-city-1', List<CartItemModel>? items}) {
   return CartGroupModel(
     storeId: 'store-1',
     storeName: 'Test Store',
     storeAddressId: storeAddressId,
-    items: [
-      CartItemModel(
-        id: 'item-1',
-        productId: 'prod-1',
-        quantity: 2,
-        productName: 'Test Product',
-        price: 10000,
-        stock: 10,
-        weight: 1.0,
-      ),
-    ],
+    items: items ??
+        [
+          CartItemModel(
+            id: 'item-1',
+            productId: 'prod-1',
+            quantity: 2,
+            productName: 'Test Product',
+            price: 10000,
+            stock: 10,
+            weight: 1.0,
+          ),
+        ],
   );
 }
 
@@ -242,6 +243,74 @@ void main() {
       expect(result, transaction);
       expect(container.read(checkoutProvider(testGroup)).isSubmitting, isFalse);
       expect(container.read(checkoutProvider(testGroup)).submitError, isNull);
+    });
+
+    // TransactionRepository::resolveVariant() di backend menolak checkout
+    // produk bervarian tanpa variant_id -- submit() sebelumnya cuma kirim
+    // product_id/qty, jadi checkout varian selalu gagal di server meski
+    // sudah lolos semua validasi lokal.
+    test('includes variant_id in the products payload when the cart line has one', () async {
+      final groupWithVariant = _group(items: [
+        CartItemModel(
+          id: 'item-1',
+          productId: 'prod-1',
+          variantId: 'variant-mahal',
+          quantity: 2,
+          productName: 'Test Product',
+          price: 150000,
+          stock: 5,
+          weight: 1.0,
+        ),
+      ]);
+      final container2 = ProviderContainer(
+        overrides: [
+          addressRepositoryProvider.overrideWithValue(addressRepository),
+          shipmentRepositoryProvider.overrideWithValue(shipmentRepository),
+          transactionRepositoryProvider.overrideWithValue(transactionRepository),
+          voucherRepositoryProvider.overrideWithValue(voucherRepository),
+        ],
+      );
+      addTearDown(container2.dispose);
+
+      when(() => addressRepository.getAddresses()).thenAnswer((_) async => [_address()]);
+      await container2.read(checkoutProvider(groupWithVariant).notifier).loadSavedAddresses();
+      final notifier = container2.read(checkoutProvider(groupWithVariant).notifier);
+      notifier.selectCourier(
+        CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne'),
+      );
+      when(() => transactionRepository.createTransaction(
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+          )).thenAnswer((_) async => _transaction());
+
+      await notifier.submit(buyerId: 'buyer-1');
+
+      verify(() => transactionRepository.createTransaction(
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: [
+              {'product_id': 'prod-1', 'variant_id': 'variant-mahal', 'qty': 2},
+            ],
+          )).called(1);
     });
 
     test('passes the applied voucher code through to the repository', () async {

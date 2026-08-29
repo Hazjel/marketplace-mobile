@@ -93,7 +93,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       ],
       bottomBar: _AddToCartBar(
         isAdding: viewModel.addingToCart,
-        isOutOfStock: product.stock <= 0,
+        isOutOfStock: viewModel.effectiveStock <= 0,
         onAdd: _addToCart,
       ),
       body: SingleChildScrollView(
@@ -107,7 +107,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    CurrencyFormatter.formatRupiah(product.price),
+                    CurrencyFormatter.formatRupiah(viewModel.effectivePrice),
                     style: AppTheme.priceLg.copyWith(
                       color:
                           isDark ? AppTheme.darkPrimary : AppTheme.primary,
@@ -116,7 +116,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   const SizedBox(height: AppTheme.spacingSM),
                   Text(product.name, style: AppTheme.titleLg),
                   const SizedBox(height: AppTheme.spacingMD),
-                  _StatsRow(product: product),
+                  _StatsRow(product: product, effectiveStock: viewModel.effectiveStock),
+                  if (product.hasVariants) ...[
+                    const SizedBox(height: AppTheme.spacingLG),
+                    _VariantPicker(
+                      variants: product.variants,
+                      selected: viewModel.selectedVariant,
+                      onSelect: notifier.selectVariant,
+                    ),
+                  ],
                   const SizedBox(height: AppTheme.spacingLG),
                   const Divider(height: 1),
                   if (product.store != null) ...[
@@ -238,8 +246,9 @@ class _ProductImage extends StatelessWidget {
 
 class _StatsRow extends StatelessWidget {
   final ProductModel product;
+  final int effectiveStock;
 
-  const _StatsRow({required this.product});
+  const _StatsRow({required this.product, required this.effectiveStock});
 
   @override
   Widget build(BuildContext context) {
@@ -258,8 +267,8 @@ class _StatsRow extends StatelessWidget {
         ),
         _Stat(
           icon: AppIcons.package,
-          label: 'Stok ${product.stock}',
-          color: product.stock <= 0 ? AppTheme.error : muted,
+          label: 'Stok $effectiveStock',
+          color: effectiveStock <= 0 ? AppTheme.error : muted,
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -296,6 +305,79 @@ class _Stat extends StatelessWidget {
         AppIcon(icon, size: 14, color: color),
         const SizedBox(width: 5),
         Text(label, style: AppTheme.bodySm.copyWith(color: color)),
+      ],
+    );
+  }
+}
+
+/// Daftar chip satu per varian (bukan attribute-grid seperti web) --
+/// tetap menjamin buyer memilih varian yang PERSIS sama dengan yang
+/// dikirim sebagai variant_id ke checkout, cukup lebih sederhana secara
+/// visual daripada picker per-attribute (Warna/Ukuran terpisah) di web.
+class _VariantPicker extends StatelessWidget {
+  final List<ProductVariantModel> variants;
+  final ProductVariantModel? selected;
+  final ValueChanged<ProductVariantModel> onSelect;
+
+  const _VariantPicker({
+    required this.variants,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Pilih Varian', style: AppTheme.titleSm),
+        const SizedBox(height: AppTheme.spacingSM),
+        Wrap(
+          spacing: AppTheme.spacingSM,
+          runSpacing: AppTheme.spacingSM,
+          children: variants.map((variant) {
+            final isSelected = selected?.id == variant.id;
+            final isOut = variant.stock <= 0;
+
+            return InkWell(
+              onTap: isOut ? null : () => onSelect(variant),
+              borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingMD,
+                  vertical: AppTheme.spacingSM,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  border: Border.all(
+                    color: isSelected
+                        ? (isDark ? AppTheme.darkPrimary : AppTheme.primary)
+                        : (isDark ? AppTheme.darkBorder : AppTheme.border),
+                    width: isSelected ? 2 : 1,
+                  ),
+                  color: isSelected
+                      ? (isDark ? AppTheme.darkPrimary : AppTheme.primary)
+                          .withValues(alpha: 0.08)
+                      : null,
+                ),
+                child: Text(
+                  isOut ? '${variant.name} (Habis)' : variant.name,
+                  style: AppTheme.labelMd.copyWith(
+                    color: isOut
+                        ? muted
+                        : (isSelected
+                            ? (isDark ? AppTheme.darkPrimary : AppTheme.primary)
+                            : null),
+                    decoration: isOut ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }

@@ -13,7 +13,13 @@ extension JsonCast on Map<String, dynamic> {
     if (v == null) return fallback;
     if (v is int) return v;
     if (v is num) return v.toInt();
-    if (v is String) return int.tryParse(v) ?? fallback;
+    // int.tryParse() gagal untuk string berdesimal seperti "150000.00" --
+    // itu persis bentuk Laravel decimal-cast fields (mis. harga varian
+    // produk, ProductVariantMongo::price cast 'decimal:2') sebelum ada
+    // normalisasi eksplisit di resource-nya. double.tryParse() menerima
+    // keduanya ("7" dan "150000.00"), fallback tetap sama kalau memang
+    // bukan angka sama sekali.
+    if (v is String) return double.tryParse(v)?.round() ?? fallback;
     return fallback;
   }
 

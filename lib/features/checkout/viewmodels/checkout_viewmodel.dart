@@ -260,8 +260,11 @@ class CheckoutNotifier
                 shippingType: courier.serviceName,
                 shippingCost: courier.shippingCostNet,
                 products: state.group.items
-                    .map((item) =>
-                        {'product_id': item.productId, 'qty': item.quantity})
+                    .map((item) => {
+                          'product_id': item.productId,
+                          'variant_id': item.variantId,
+                          'qty': item.quantity,
+                        })
                     .toList(),
                 voucherCode: state.appliedVoucher?.code,
               );

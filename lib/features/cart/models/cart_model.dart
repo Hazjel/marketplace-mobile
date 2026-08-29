@@ -1,3 +1,5 @@
+import 'package:blukios_marketplace/core/utils/json.dart';
+
 class CartItemModel {
   final String id;
   final String productId;
@@ -25,17 +27,39 @@ class CartItemModel {
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
     final product = json['product'] ?? {};
+    final variantId = json['variant_id']?.toString();
+
+    // product['price']/['stock'] agregat (varian termurah/total stok) --
+    // sama seperti bug Vue's _applyServerCart(), harus resolve ke varian
+    // yang SEBENARNYA dibeli lewat product['variants'], bukan pakai
+    // agregat langsung.
+    Map<String, dynamic>? variant;
+    if (variantId != null && product['variants'] is List) {
+      for (final v in (product['variants'] as List)) {
+        if (v is Map<String, dynamic> && v['id']?.toString() == variantId) {
+          variant = v;
+          break;
+        }
+      }
+    }
+
     return CartItemModel(
       id: json['id'].toString(),
       productId: (json['product_id'] ?? product['id'] ?? '').toString(),
-      variantId: json['variant_id']?.toString(),
+      variantId: variantId,
       quantity: (json['quantity'] ?? 1) is int ? json['quantity'] ?? 1 : (json['quantity'] as num).toInt(),
       note: json['note'],
       productName: product['name'] ?? '',
       productThumbnail: product['thumbnail'],
-      price: (product['price'] ?? 0).toDouble(),
-      stock: (product['stock'] ?? 0) is int ? product['stock'] ?? 0 : (product['stock'] as num).toInt(),
-      weight: (product['weight'] ?? 0).toDouble(),
+      // asDouble()/asInt() (bukan .toDouble()/type-check manual) supaya
+      // aman kalau backend pernah mengirim angka sebagai decimal string
+      // (mis. Laravel 'decimal:2' cast yang belum dinormalisasi di
+      // resource-nya, kelas bug yang sama dengan ProductVariantResource::price
+      // sebelum diperbaiki) -- .toDouble() dulu di sini akan crash
+      // (NoSuchMethodError) untuk String, bukan cuma salah nilai.
+      price: {'v': variant?['price'] ?? product['price'] ?? 0}.asDouble('v'),
+      stock: {'v': variant?['stock'] ?? product['stock'] ?? 0}.asInt('v'),
+      weight: {'v': product['weight'] ?? 0}.asDouble('v'),
     );
   }
 
