@@ -1,3 +1,5 @@
+import 'package:blukios_marketplace/core/utils/json.dart';
+
 class CartItemModel {
   final String id;
   final String productId;
@@ -49,11 +51,15 @@ class CartItemModel {
       note: json['note'],
       productName: product['name'] ?? '',
       productThumbnail: product['thumbnail'],
-      price: ((variant?['price'] ?? product['price']) ?? 0).toDouble(),
-      stock: (((variant?['stock'] ?? product['stock']) ?? 0) is int)
-          ? (variant?['stock'] ?? product['stock'] ?? 0)
-          : (((variant?['stock'] ?? product['stock']) as num)).toInt(),
-      weight: (product['weight'] ?? 0).toDouble(),
+      // asDouble()/asInt() (bukan .toDouble()/type-check manual) supaya
+      // aman kalau backend pernah mengirim angka sebagai decimal string
+      // (mis. Laravel 'decimal:2' cast yang belum dinormalisasi di
+      // resource-nya, kelas bug yang sama dengan ProductVariantResource::price
+      // sebelum diperbaiki) -- .toDouble() dulu di sini akan crash
+      // (NoSuchMethodError) untuk String, bukan cuma salah nilai.
+      price: {'v': variant?['price'] ?? product['price'] ?? 0}.asDouble('v'),
+      stock: {'v': variant?['stock'] ?? product['stock'] ?? 0}.asInt('v'),
+      weight: {'v': product['weight'] ?? 0}.asDouble('v'),
     );
   }
 

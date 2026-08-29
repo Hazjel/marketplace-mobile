@@ -90,4 +90,38 @@ void main() {
       expect(p.store?.username, isNull);
     });
   });
+
+  group('ProductVariantModel.fromJson', () {
+    // Kontrak nyata ProductVariantResource: ProductVariantMongo::price cast
+    // 'decimal:2', jadi payload varian JSON-nya "150000.00" (string) sebelum
+    // dinormalisasi -- fixture di sini pakai bentuk itu persis, bukan angka
+    // literal, supaya test ini benar-benar menutup gap yang int.tryParse()
+    // tidak tangani.
+    test('parses price/stock from the real decimal-string API contract', () {
+      final v = ProductVariantModel.fromJson({
+        'id': 'variant-1',
+        'name': 'Biru/L',
+        'price': '150000.00',
+        'stock': '5',
+        'sku': 'KV-BIRU-L',
+        'variant_attributes': {'Warna': 'Biru', 'Ukuran': 'L'},
+      });
+
+      expect(v.price, 150000);
+      expect(v.stock, 5);
+      expect(v.attributes, {'Warna': 'Biru', 'Ukuran': 'L'});
+    });
+
+    test('also accepts numeric (already-normalized) price/stock', () {
+      final v = ProductVariantModel.fromJson({
+        'id': 'variant-1',
+        'name': 'Biru/L',
+        'price': 150000,
+        'stock': 5,
+      });
+
+      expect(v.price, 150000);
+      expect(v.stock, 5);
+    });
+  });
 }
