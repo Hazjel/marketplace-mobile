@@ -25,16 +25,34 @@ class CartItemModel {
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
     final product = json['product'] ?? {};
+    final variantId = json['variant_id']?.toString();
+
+    // product['price']/['stock'] agregat (varian termurah/total stok) --
+    // sama seperti bug Vue's _applyServerCart(), harus resolve ke varian
+    // yang SEBENARNYA dibeli lewat product['variants'], bukan pakai
+    // agregat langsung.
+    Map<String, dynamic>? variant;
+    if (variantId != null && product['variants'] is List) {
+      for (final v in (product['variants'] as List)) {
+        if (v is Map<String, dynamic> && v['id']?.toString() == variantId) {
+          variant = v;
+          break;
+        }
+      }
+    }
+
     return CartItemModel(
       id: json['id'].toString(),
       productId: (json['product_id'] ?? product['id'] ?? '').toString(),
-      variantId: json['variant_id']?.toString(),
+      variantId: variantId,
       quantity: (json['quantity'] ?? 1) is int ? json['quantity'] ?? 1 : (json['quantity'] as num).toInt(),
       note: json['note'],
       productName: product['name'] ?? '',
       productThumbnail: product['thumbnail'],
-      price: (product['price'] ?? 0).toDouble(),
-      stock: (product['stock'] ?? 0) is int ? product['stock'] ?? 0 : (product['stock'] as num).toInt(),
+      price: ((variant?['price'] ?? product['price']) ?? 0).toDouble(),
+      stock: (((variant?['stock'] ?? product['stock']) ?? 0) is int)
+          ? (variant?['stock'] ?? product['stock'] ?? 0)
+          : (((variant?['stock'] ?? product['stock']) as num)).toInt(),
       weight: (product['weight'] ?? 0).toDouble(),
     );
   }
