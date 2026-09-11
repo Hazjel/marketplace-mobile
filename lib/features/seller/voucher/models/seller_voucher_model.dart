@@ -1,15 +1,5 @@
 import 'package:blukios_marketplace/core/utils/json.dart';
 
-/// Coerces a nullable numeric API field (num or numeric string) to
-/// [double], or null when absent — mirrors the pattern used by
-/// `AddressModel.latitude`/`longitude` for other nullable money-ish fields.
-double? _asDoubleOrNull(dynamic v) {
-  if (v == null) return null;
-  if (v is num) return v.toDouble();
-  if (v is String) return double.tryParse(v);
-  return null;
-}
-
 int? _asIntOrNull(dynamic v) {
   if (v == null) return null;
   if (v is int) return v;
@@ -66,9 +56,11 @@ class SellerVoucherModel {
       code: json.asString('code'),
       storeId: json.asString('store_id'),
       type: json.asString('type'),
-      value: json.asDouble('value'),
-      minPurchase: _asDoubleOrNull(json['min_purchase']),
-      maxDiscount: _asDoubleOrNull(json['max_discount']),
+      // fixed: whole rupiah; percentage: a rate (e.g. 10.5) -- both always
+      // numeric per money-json-contract.md, never a string.
+      value: json.moneyNum('value'),
+      minPurchase: json.moneyIntOrNull('min_purchase')?.toDouble(),
+      maxDiscount: json.moneyIntOrNull('max_discount')?.toDouble(),
       usageLimit: _asIntOrNull(json['usage_limit']),
       usageLimitPerBuyer: _asIntOrNull(json['usage_limit_per_buyer']),
       redeemedCount: json.asInt('redeemed_count'),

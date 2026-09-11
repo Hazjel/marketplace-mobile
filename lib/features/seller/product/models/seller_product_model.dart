@@ -57,7 +57,7 @@ class SellerProductModel {
       slug: json.asString('slug'),
       description: json.asString('description'),
       condition: json.asString('condition', 'new'),
-      price: json.asDouble('price'),
+      price: json.moneyInt('price').toDouble(),
       weight: json.asDouble('weight'),
       stock: json.asInt('stock'),
       totalSold: json.asInt('total_sold'),
@@ -131,7 +131,7 @@ class SellerProductVariantModel {
     return SellerProductVariantModel(
       id: json.asStringOrNull('id'),
       name: json.asString('name'),
-      price: json.asDouble('price'),
+      price: json.moneyInt('price').toDouble(),
       stock: json.asInt('stock'),
       sku: json.asStringOrNull('sku'),
       variantAttributes: attrs is Map

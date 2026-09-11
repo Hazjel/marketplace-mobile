@@ -59,7 +59,7 @@ class ProductModel {
       name: json.asString('name'),
       slug: json.asString('slug'),
       description: json.asStringOrNull('description'),
-      price: json.asInt('price'),
+      price: json.moneyInt('price'),
       stock: json.asInt('stock'),
       weight: json.asDouble('weight'),
       condition: json.asString('condition', 'new'),
@@ -112,7 +112,7 @@ class ProductVariantModel {
     return ProductVariantModel(
       id: json.asString('id'),
       name: json.asString('name'),
-      price: json.asInt('price'),
+      price: json.moneyInt('price'),
       stock: json.asInt('stock'),
       sku: json.asStringOrNull('sku'),
       image: json.asStringOrNull('image'),

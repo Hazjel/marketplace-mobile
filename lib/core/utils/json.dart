@@ -58,4 +58,41 @@ extension JsonCast on Map<String, dynamic> {
     if (v is String) return v;
     return v.toString();
   }
+
+  /// Strict parser for an API field the Sprint C1 money contract
+  /// (`api-blue/docs/money-json-contract.md`) guarantees is a JSON
+  /// integer -- product/variant price, transaction money fields, a fixed
+  /// voucher's rupiah fields. Throws [FormatException] instead of
+  /// silently defaulting to 0: a missing or fractional value there is a
+  /// contract violation (e.g. a pre-C1 legacy fractional `discount_amount`)
+  /// and must surface, not display as a wrong/zero amount.
+  int moneyInt(String key) {
+    final v = this[key];
+    if (v is int) return v;
+    if (v is num && v == v.roundToDouble()) return v.toInt();
+    throw FormatException(
+      'Expected integer money field "$key" per money-json-contract.md, got: $v (${v.runtimeType})',
+    );
+  }
+
+  /// [moneyInt], but returns null when [key] is absent or JSON `null` --
+  /// for optional integer-money fields (a voucher's `min_purchase`/
+  /// `max_discount`). Still throws if the key is present with a
+  /// non-integer value.
+  int? moneyIntOrNull(String key) {
+    if (this[key] == null) return null;
+    return moneyInt(key);
+  }
+
+  /// Strict numeric parser for a required money-ish field that is not
+  /// always a whole integer (a voucher's `value`, fixed rupiah or a
+  /// percentage rate). Throws instead of silently defaulting to 0 -- a
+  /// malformed value must not render as a free/zero-value voucher.
+  double moneyNum(String key) {
+    final v = this[key];
+    if (v is num) return v.toDouble();
+    throw FormatException(
+      'Expected numeric money field "$key" per money-json-contract.md, got: $v (${v.runtimeType})',
+    );
+  }
 }
