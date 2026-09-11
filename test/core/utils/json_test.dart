@@ -34,17 +34,21 @@ void main() {
   });
 
   // Sprint C1's money-json-contract.md guarantees these fields are already
-  // a JSON integer -- unlike asInt (above), which exists precisely because
-  // the API *used* to leak decimal-cast strings. moneyInt must NOT repeat
-  // that leniency: a missing/fractional/string value there is now a
-  // contract violation and has to surface, not silently become 0.
+  // a JSON integer, never a float -- unlike asInt (above), which exists
+  // precisely because the API *used* to leak decimal-cast strings.
+  // moneyInt must NOT repeat that leniency: a missing/fractional/string/
+  // float-typed value there is now a contract violation and has to
+  // surface, not silently become 0 or get coerced away.
   group('JsonCast.moneyInt', () {
     test('accepts a JSON integer', () {
       expect({'v': 150000}.moneyInt('v'), 150000);
     });
 
-    test('accepts a whole-valued double', () {
-      expect({'v': 150000.0}.moneyInt('v'), 150000);
+    // A whole-valued double (150000.0) is still a wire-contract regression
+    // -- the contract is "JSON integer, never float" -- so it must throw,
+    // not get silently coerced to int.
+    test('throws on a whole-valued double instead of coercing it', () {
+      expect(() => {'v': 150000.0}.moneyInt('v'), throwsFormatException);
     });
 
     test('throws on a fractional double instead of truncating', () {
@@ -53,6 +57,10 @@ void main() {
 
     test('throws on a decimal string instead of parsing it', () {
       expect(() => {'v': '150000.00'}.moneyInt('v'), throwsFormatException);
+    });
+
+    test('throws on an integer-looking string instead of parsing it', () {
+      expect(() => {'v': '150000'}.moneyInt('v'), throwsFormatException);
     });
 
     test('throws when the key is missing', () {
@@ -73,8 +81,12 @@ void main() {
       expect({'v': null}.moneyIntOrNull('v'), isNull);
     });
 
-    test('still throws when present with a non-integer value', () {
+    test('still throws when present with a decimal-string value', () {
       expect(() => {'v': '5000.50'}.moneyIntOrNull('v'), throwsFormatException);
+    });
+
+    test('still throws when present with a whole-valued double', () {
+      expect(() => {'v': 5000.0}.moneyIntOrNull('v'), throwsFormatException);
     });
 
     test('returns the value when present and valid', () {

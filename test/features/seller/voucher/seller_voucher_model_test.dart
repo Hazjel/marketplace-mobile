@@ -45,6 +45,32 @@ void main() {
       );
     });
 
+    // Review fix: a fixed voucher's `value` must reject a fractional
+    // *numeric* value too, not just a decimal string -- money-json-contract.md
+    // says fixed `value` is a JSON integer, so 20000.5 is a contract
+    // violation the same way "20000.00" is.
+    test('throws on a fractional numeric fixed value instead of accepting it', () {
+      expect(
+        () => SellerVoucherModel.fromJson(_fixed(value: 20000.5)),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    // A whole-valued double for a fixed voucher is also a wire-contract
+    // regression (JSON integer, never float) and must throw, mirroring
+    // moneyInt's own strictness.
+    test('throws on a whole-valued double fixed value instead of coercing it', () {
+      expect(
+        () => SellerVoucherModel.fromJson(_fixed(value: 20000.0)),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('a percentage rate may be a whole number, still not narrowed to int', () {
+      final v = SellerVoucherModel.fromJson(_percentage(value: 10));
+      expect(v.value, 10.0);
+    });
+
     test('throws on a fractional min_purchase/max_discount instead of truncating', () {
       final json = _fixed()..['min_purchase'] = '50000.50';
       expect(() => SellerVoucherModel.fromJson(json), throwsA(isA<FormatException>()));

@@ -63,13 +63,15 @@ extension JsonCast on Map<String, dynamic> {
   /// (`api-blue/docs/money-json-contract.md`) guarantees is a JSON
   /// integer -- product/variant price, transaction money fields, a fixed
   /// voucher's rupiah fields. Throws [FormatException] instead of
-  /// silently defaulting to 0: a missing or fractional value there is a
-  /// contract violation (e.g. a pre-C1 legacy fractional `discount_amount`)
-  /// and must surface, not display as a wrong/zero amount.
+  /// silently defaulting to 0: a missing, fractional, or **float-typed**
+  /// value there is a contract violation and must surface, not display as
+  /// a wrong/zero amount. Only an actual Dart `int` is accepted -- a
+  /// whole-valued `double` (`150000.0`) is rejected too, since the
+  /// contract is "JSON integer, never float" and silently coercing it
+  /// would mask a backend wire-format regression.
   int moneyInt(String key) {
     final v = this[key];
     if (v is int) return v;
-    if (v is num && v == v.roundToDouble()) return v.toInt();
     throw FormatException(
       'Expected integer money field "$key" per money-json-contract.md, got: $v (${v.runtimeType})',
     );
