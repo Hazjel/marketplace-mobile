@@ -1,3 +1,5 @@
+import 'package:blukios_marketplace/core/utils/json.dart';
+
 class TransactionModel {
   final String id;
   final String code;
@@ -74,15 +76,15 @@ class TransactionModel {
       destLongitude: json['dest_longitude'] != null ? (json['dest_longitude'] as num).toDouble() : null,
       shipping: json['shipping'],
       shippingType: json['shipping_type'],
-      shippingCost: (json['shipping_cost'] ?? 0).toDouble(),
+      shippingCost: json.moneyInt('shipping_cost').toDouble(),
       trackingNumber: json['tracking_number'],
       deliveryProof: json['delivery_proof'],
       deliveryStatus: json['delivery_status'] ?? 'pending',
-      tax: (json['tax'] ?? 0).toDouble(),
-      grandTotal: (json['grand_total'] ?? 0).toDouble(),
+      tax: json.moneyInt('tax').toDouble(),
+      grandTotal: json.moneyInt('grand_total').toDouble(),
       voucherId: json['voucher_id']?.toString(),
       voucherCode: json['voucher_code'],
-      discountAmount: (json['discount_amount'] ?? 0).toDouble(),
+      discountAmount: json.moneyInt('discount_amount').toDouble(),
       paymentStatus: json['payment_status'] ?? 'pending',
       snapToken: json['snap_token'],
       createdAt: json['created_at'],
@@ -195,7 +197,7 @@ class TransactionDetailModel {
       productName: product != null ? product['name'] : null,
       productThumbnail: product != null ? product['thumbnail'] : null,
       qty: (json['qty'] ?? 1) is int ? json['qty'] ?? 1 : (json['qty'] as num).toInt(),
-      subtotal: (json['subtotal'] ?? 0).toDouble(),
+      subtotal: json.moneyInt('subtotal').toDouble(),
     );
   }
 }

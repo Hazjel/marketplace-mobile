@@ -1,15 +1,5 @@
 import 'package:blukios_marketplace/core/utils/json.dart';
 
-/// Coerces a nullable numeric API field (num or numeric string) to
-/// [double], or null when absent — mirrors the pattern used by
-/// `AddressModel.latitude`/`longitude` for other nullable money-ish fields.
-double? _asDoubleOrNull(dynamic v) {
-  if (v == null) return null;
-  if (v is num) return v.toDouble();
-  if (v is String) return double.tryParse(v);
-  return null;
-}
-
 int? _asIntOrNull(dynamic v) {
   if (v == null) return null;
   if (v is int) return v;
@@ -61,14 +51,20 @@ class SellerVoucherModel {
       expiresAt != null && expiresAt!.isBefore(DateTime.now());
 
   factory SellerVoucherModel.fromJson(Map<String, dynamic> json) {
+    final type = json.asString('type');
     return SellerVoucherModel(
       id: json.asString('id'),
       code: json.asString('code'),
       storeId: json.asString('store_id'),
-      type: json.asString('type'),
-      value: json.asDouble('value'),
-      minPurchase: _asDoubleOrNull(json['min_purchase']),
-      maxDiscount: _asDoubleOrNull(json['max_discount']),
+      type: type,
+      // fixed: whole rupiah, JSON integer -- percentage: a decimal rate
+      // (e.g. 10.5), never narrowed. money-json-contract.md's `value` is
+      // conditional on `type`, so the parser has to be too: moneyNum alone
+      // would let a fixed voucher's value regress to a fractional rupiah
+      // amount (e.g. 20000.5) without ever throwing.
+      value: type == 'fixed' ? json.moneyInt('value').toDouble() : json.moneyNum('value'),
+      minPurchase: json.moneyIntOrNull('min_purchase')?.toDouble(),
+      maxDiscount: json.moneyIntOrNull('max_discount')?.toDouble(),
       usageLimit: _asIntOrNull(json['usage_limit']),
       usageLimitPerBuyer: _asIntOrNull(json['usage_limit_per_buyer']),
       redeemedCount: json.asInt('redeemed_count'),

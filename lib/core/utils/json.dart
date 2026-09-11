@@ -58,4 +58,44 @@ extension JsonCast on Map<String, dynamic> {
     if (v is String) return v;
     return v.toString();
   }
+
+  /// Strict parser for an API field the Sprint C1 money contract
+  /// (`api-blue/docs/money-json-contract.md`) guarantees is a JSON
+  /// integer -- product/variant price, transaction money fields, a fixed
+  /// voucher's rupiah fields. Throws [FormatException] instead of
+  /// silently defaulting to 0: a missing, fractional, or **float-typed**
+  /// value there is a contract violation and must surface, not display as
+  /// a wrong/zero amount. Only an actual Dart `int` is accepted -- a
+  /// whole-valued `double` (`150000.0`) is rejected too, since the
+  /// contract is "JSON integer, never float" and silently coercing it
+  /// would mask a backend wire-format regression.
+  int moneyInt(String key) {
+    final v = this[key];
+    if (v is int) return v;
+    throw FormatException(
+      'Expected integer money field "$key" per money-json-contract.md, got: $v (${v.runtimeType})',
+    );
+  }
+
+  /// [moneyInt], but returns null when [key] is absent or JSON `null` --
+  /// for optional integer-money fields (a voucher's `min_purchase`/
+  /// `max_discount`). Still throws if the key is present with a
+  /// non-integer value.
+  int? moneyIntOrNull(String key) {
+    if (this[key] == null) return null;
+    return moneyInt(key);
+  }
+
+  /// Strict numeric parser for a money-ish field that is a decimal rate,
+  /// not whole rupiah (a percentage voucher's `value`, e.g. `10.5`).
+  /// Throws instead of silently defaulting to 0 -- a malformed value must
+  /// not render as a free/zero-value voucher. For a field the contract
+  /// says is whole rupiah, use [moneyInt] instead.
+  double moneyNum(String key) {
+    final v = this[key];
+    if (v is num) return v.toDouble();
+    throw FormatException(
+      'Expected numeric money field "$key" per money-json-contract.md, got: $v (${v.runtimeType})',
+    );
+  }
 }
