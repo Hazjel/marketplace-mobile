@@ -26,7 +26,7 @@ class CartItemModel {
   });
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
-    final product = json['product'] ?? {};
+    final product = (json['product'] ?? {}) as Map<String, dynamic>;
     final variantId = json['variant_id']?.toString();
 
     // product['price']/['stock'] agregat (varian termurah/total stok) --
@@ -43,6 +43,14 @@ class CartItemModel {
       }
     }
 
+    // `product` is a serialized `ProductResource`, and a resolved `variant`
+    // a serialized `ProductVariantResource` -- both C1-contracted, so their
+    // `price` is always a JSON integer regardless of cart's own
+    // display-only/non-authoritative status. moneyInt() throws instead of
+    // silently accepting a legacy decimal-string or float, or defaulting a
+    // missing price to 0.
+    final priceSource = variant ?? product;
+
     return CartItemModel(
       id: json['id'].toString(),
       productId: (json['product_id'] ?? product['id'] ?? '').toString(),
@@ -51,13 +59,7 @@ class CartItemModel {
       note: json['note'],
       productName: product['name'] ?? '',
       productThumbnail: product['thumbnail'],
-      // asDouble()/asInt() (bukan .toDouble()/type-check manual) supaya
-      // aman kalau backend pernah mengirim angka sebagai decimal string
-      // (mis. Laravel 'decimal:2' cast yang belum dinormalisasi di
-      // resource-nya, kelas bug yang sama dengan ProductVariantResource::price
-      // sebelum diperbaiki) -- .toDouble() dulu di sini akan crash
-      // (NoSuchMethodError) untuk String, bukan cuma salah nilai.
-      price: {'v': variant?['price'] ?? product['price'] ?? 0}.asDouble('v'),
+      price: priceSource.moneyInt('price').toDouble(),
       stock: {'v': variant?['stock'] ?? product['stock'] ?? 0}.asInt('v'),
       weight: {'v': product['weight'] ?? 0}.asDouble('v'),
     );

@@ -86,10 +86,11 @@ extension JsonCast on Map<String, dynamic> {
     return moneyInt(key);
   }
 
-  /// Strict numeric parser for a required money-ish field that is not
-  /// always a whole integer (a voucher's `value`, fixed rupiah or a
-  /// percentage rate). Throws instead of silently defaulting to 0 -- a
-  /// malformed value must not render as a free/zero-value voucher.
+  /// Strict numeric parser for a money-ish field that is a decimal rate,
+  /// not whole rupiah (a percentage voucher's `value`, e.g. `10.5`).
+  /// Throws instead of silently defaulting to 0 -- a malformed value must
+  /// not render as a free/zero-value voucher. For a field the contract
+  /// says is whole rupiah, use [moneyInt] instead.
   double moneyNum(String key) {
     final v = this[key];
     if (v is num) return v.toDouble();

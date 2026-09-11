@@ -8,7 +8,7 @@ import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 // menampilkan harga varian termurah setiap kali di-refresh dari server.
 void main() {
   group('CartItemModel.fromJson — variant price/stock resolution', () {
-    Map<String, dynamic> serverItem({String? variantId}) => {
+    Map<String, dynamic> serverItem({String? variantId, Object? variantPrice = 150000}) => {
           'id': 'cart-item-1',
           'product_id': 'product-1',
           'variant_id': variantId,
@@ -21,7 +21,7 @@ void main() {
             'weight': 200,
             'variants': [
               {'id': 'variant-murah', 'name': 'Merah/S', 'price': 100000, 'stock': 10},
-              {'id': 'variant-mahal', 'name': 'Biru/L', 'price': 150000, 'stock': 5},
+              {'id': 'variant-mahal', 'name': 'Biru/L', 'price': variantPrice, 'stock': 5},
             ],
           },
         };
@@ -65,33 +65,82 @@ void main() {
       expect(item.variantId, 'variant-yang-hilang');
     });
 
-    // Kontrak nyata ProductVariantResource: ProductVariantMongo::price cast
-    // 'decimal:2' -> payload "150000.00" (string). Sebelumnya baris ini
-    // memakai .toDouble() langsung, yang CRASH (NoSuchMethodError) untuk
-    // String, bukan cuma salah nilai -- fixture ini pakai bentuk API asli,
-    // bukan angka literal, supaya menutup gap itu.
-    test('parses a variant price/stock sent as the real decimal-string API contract', () {
+    // Sprint C1: cart's `product` is a serialized ProductResource, and a
+    // resolved variant a serialized ProductVariantResource -- both
+    // C1-contracted, so their `price` is a JSON integer, never a decimal
+    // string or float, regardless of cart being display-only.
+    test('throws on a variant decimal-string price instead of tolerating it', () {
+      expect(
+        () => CartItemModel.fromJson(
+          serverItem(variantId: 'variant-mahal', variantPrice: '150000.00'),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('throws on a variant whole-valued double price instead of coercing it', () {
+      expect(
+        () => CartItemModel.fromJson(
+          serverItem(variantId: 'variant-mahal', variantPrice: 150000.0),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('throws on a product decimal-string price instead of tolerating it', () {
       final json = {
-        'id': 'cart-item-3',
-        'product_id': 'product-1',
-        'variant_id': 'variant-mahal',
+        'id': 'cart-item-2',
+        'product_id': 'product-2',
+        'variant_id': null,
         'quantity': 1,
         'note': null,
         'product': {
-          'name': 'Kaos Variasi',
-          'price': '100000.00',
-          'stock': 15,
-          'weight': 200,
-          'variants': [
-            {'id': 'variant-mahal', 'name': 'Biru/L', 'price': '150000.00', 'stock': '5'},
-          ],
+          'name': 'Produk Tanpa Varian',
+          'price': '20000.00',
+          'stock': 5,
+          'weight': 100,
+          'variants': [],
         },
       };
 
-      final item = CartItemModel.fromJson(json);
+      expect(() => CartItemModel.fromJson(json), throwsA(isA<FormatException>()));
+    });
 
-      expect(item.price, 150000.0);
-      expect(item.stock, 5);
+    test('throws on a product whole-valued double price instead of coercing it', () {
+      final json = {
+        'id': 'cart-item-2',
+        'product_id': 'product-2',
+        'variant_id': null,
+        'quantity': 1,
+        'note': null,
+        'product': {
+          'name': 'Produk Tanpa Varian',
+          'price': 20000.0,
+          'stock': 5,
+          'weight': 100,
+          'variants': [],
+        },
+      };
+
+      expect(() => CartItemModel.fromJson(json), throwsA(isA<FormatException>()));
+    });
+
+    test('throws instead of defaulting to 0 when the selected price is missing', () {
+      final json = {
+        'id': 'cart-item-2',
+        'product_id': 'product-2',
+        'variant_id': null,
+        'quantity': 1,
+        'note': null,
+        'product': {
+          'name': 'Produk Tanpa Varian',
+          'stock': 5,
+          'weight': 100,
+          'variants': [],
+        },
+      };
+
+      expect(() => CartItemModel.fromJson(json), throwsA(isA<FormatException>()));
     });
   });
 }
