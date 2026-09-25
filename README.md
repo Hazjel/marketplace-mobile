@@ -2,7 +2,7 @@
 
 Aplikasi mobile marketplace berbasis Flutter yang terintegrasi dengan Laravel 12 API (api-blue).
 
-CI/CD: Jenkins (`Jenkinsfile` di root repo ini) — server Jenkins sama dengan yang dipakai `e:\blue`, job perlu dibuat manual di server (lihat catatan di bawah `Jenkinsfile`).
+CI/CD: Jenkins (`Jenkinsfile` di root repo ini), server sama dengan yang dipakai repo web. Job-nya masih harus didaftarkan manual di server, lihat [CI/CD](#cicd).
 
 ## Arsitektur
 
@@ -115,6 +115,32 @@ Untuk mengaktifkan:
 - [x] Shimmer loading
 - [x] Error handling dengan retry
 - [x] Indonesian localization
+
+## CI/CD
+
+`Jenkinsfile` sudah ada di repo ini, tapi **belum ada job-nya di server Jenkins**, jadi
+`flutter analyze` dan `flutter test` tidak pernah jalan otomatis. Pendaftaran job butuh
+akses admin Jenkins (API anonim ditolak 403).
+
+Dua cara memasangnya, pilih salah satu.
+
+**Lewat UI:** New Item, nama `blukios-mobile-pipeline`, tipe Pipeline. Di bagian Pipeline
+pilih "Pipeline script from SCM", SCM Git, URL `https://github.com/Hazjel/marketplace-mobile.git`,
+branch `*/main`, Script Path `Jenkinsfile`. Tanpa credential, repo ini publik.
+
+**Lewat file config** ([ci/jenkins-job.xml](ci/jenkins-job.xml)), dijalankan di host Jenkins:
+
+```bash
+docker exec fth-jenkins mkdir -p /var/jenkins_home/jobs/blukios-mobile-pipeline
+docker cp ci/jenkins-job.xml fth-jenkins:/var/jenkins_home/jobs/blukios-mobile-pipeline/config.xml
+```
+
+Jenkins membaca job baru setelah Manage Jenkins, Reload Configuration from Disk. Jangan
+me-restart container Jenkins untuk ini: pipeline project lain hidup di server yang sama.
+
+Build pertama mengunduh image `ghcr.io/cirruslabs/flutter:stable` (beberapa GB) dan di disk
+server itu bisa lama. Setelahnya cache pub dan Gradle tersimpan di volume bernama
+(`blukios-mobile-pub-cache`, `blukios-mobile-gradle`), jadi build berikutnya jauh lebih cepat.
 
 ## Catatan Pengembangan
 

@@ -1,16 +1,48 @@
-// Mirrors the pipeline style already used by the sibling monorepo (e:\blue) —
-// same Jenkins server, same conventions (pollSCM instead of a webhook since
-// Jenkins isn't publicly reachable, Docker-per-stage agents, build discard).
+// Mengikuti gaya pipeline monorepo web (repo marketplace) di Jenkins yang sama:
+// pollSCM karena Jenkins tidak publicly reachable, dan build discard.
 //
-// NOTE: this Jenkinsfile alone doesn't make Jenkins build this repo — a
-// Pipeline job pointed at this repo's URL (using "Pipeline script from SCM")
-// still needs to be created on the Jenkins server itself, which needs admin
-// access this session doesn't have. See the README's CI/CD note.
+// CATATAN: Jenkinsfile ini sendiri tidak membuat Jenkins membangun repo ini.
+// Job Pipeline "Pipeline script from SCM" yang menunjuk repo ini harus dibuat
+// di server Jenkins, dan itu butuh akses admin. Config siap pakai ada di
+// ci/jenkins-job.xml, langkahnya di README bagian CI/CD.
+
+// Pengganti agent { docker }: docker-workflow menjalankan docker stop di thread CPS yang dipotong
+// setelah 5 menit, dan di host Jenkins ini docker stop bisa lebih lama karena disk lambat.
+def runInContainer(Map opts) {
+    String name = "blukios-mobile-ci-${env.BUILD_NUMBER}-${opts.name}"
+    String scriptDir = "${env.WORKSPACE}@tmp/ci"
+    dir(scriptDir) {
+        writeFile file: "${opts.name}.sh", text: opts.script
+    }
+    try {
+        sh """
+            docker run --rm --name '${name}' \\
+                --volumes-from "\$(cat /etc/hostname)" \\
+                -u "\$(id -u):\$(id -g)" \\
+                -w "\$(pwd)" \\
+                --entrypoint sh \\
+                ${opts.args ?: ''} \\
+                '${opts.image}' -xe '${scriptDir}/${opts.name}.sh'
+        """
+    } finally {
+        // Build yang di-abort membunuh docker CLI, bukan container-nya; --rm tidak sempat jalan.
+        sh "docker rm -f '${name}' >/dev/null 2>&1 || true"
+    }
+}
+
+// Image Cirrus Labs: Flutter SDK + toolchain Android, dipakai luas untuk CI Flutter.
+FLUTTER_IMAGE = 'ghcr.io/cirruslabs/flutter:stable'
+// Cache pub dan Gradle di volume bernama: tanpa ini setiap build mengunduh ulang
+// seluruh dependency, dan di disk host ini itu bagian termahal dari build.
+CACHE_ARGS = '-v blukios-mobile-pub-cache:/root/.pub-cache -v blukios-mobile-gradle:/root/.gradle'
+
 pipeline {
     agent none
 
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        // Longgar karena disk host lambat (fsync bisa lebih dari satu detik).
+        // Batas ini hanya melindungi kerja di dalam step `sh`, bukan thread CPS.
+        timeout(time: 360, unit: 'MINUTES')
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '15'))
     }
@@ -21,48 +53,46 @@ pipeline {
 
     stages {
         stage('Analyze & Test') {
-            agent {
-                // Cirrus Labs' image — actively maintained, includes the
-                // Flutter SDK + Android toolchain, widely used for Flutter CI.
-                docker {
-                    image 'ghcr.io/cirruslabs/flutter:stable'
-                }
-            }
+            agent any
             steps {
-                sh '''
-                    flutter --version
-                    flutter pub get
-                    flutter analyze
-                    flutter test
-                '''
+                runInContainer(
+                    name: 'analyze-test',
+                    image: FLUTTER_IMAGE,
+                    args: CACHE_ARGS,
+                    script: '''
+                        flutter --version
+                        flutter pub get
+                        flutter analyze
+                        flutter test
+                    '''
+                )
             }
         }
 
         stage('Build (debug smoke test)') {
-            agent {
-                docker {
-                    image 'ghcr.io/cirruslabs/flutter:stable'
-                }
-            }
+            agent any
             steps {
-                // Compile-smoke-test only — confirms the Android toolchain
-                // still builds (the kind of thing a package-id rename could
-                // silently break). Not a release build: that needs the
-                // signing keystore, which isn't wired into this pipeline yet
-                // (see android/app/build.gradle.kts's signingConfigs and the
-                // ANDROID_KEYSTORE_* credentials this job would need once
-                // that lands).
-                sh 'flutter build apk --debug'
+                // Compile-smoke-test saja: memastikan toolchain Android masih
+                // bisa membangun (hal seperti rename package id bisa merusaknya
+                // tanpa suara). Bukan release build: itu butuh keystore signing
+                // yang belum di-wire ke pipeline ini (lihat signingConfigs di
+                // android/app/build.gradle.kts dan kredensial ANDROID_KEYSTORE_*
+                // yang job ini perlukan setelah itu ada).
+                runInContainer(
+                    name: 'build-apk',
+                    image: FLUTTER_IMAGE,
+                    args: CACHE_ARGS,
+                    script: 'flutter build apk --debug'
+                )
             }
         }
 
-        // No Deploy stage. Unlike e:\blue's web/API services (which deploy by
-        // recreating docker-compose containers), a Flutter app's "deploy" is
-        // publishing a signed artifact to the Play Store / App Store / an
-        // internal distribution channel (Firebase App Distribution, etc) —
-        // a fundamentally different, manual, business-decision-gated process
-        // that doesn't belong in an automatic on-every-push pipeline stage.
-        // Add it deliberately later, not by copying this pattern.
+        // Tidak ada stage Deploy. Berbeda dari service web/API di repo marketplace
+        // (yang deploy dengan me-recreate container docker-compose), "deploy" aplikasi
+        // Flutter berarti menerbitkan artefak yang sudah di-sign ke Play Store, App Store,
+        // atau kanal distribusi internal. Itu proses manual yang digerakkan keputusan
+        // bisnis, jadi tidak pantas jadi stage otomatis di setiap push. Tambahkan
+        // dengan sengaja nanti, bukan dengan menyalin pola ini.
     }
 
     post {
