@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/viewmodels/address_viewmodel.dart';
@@ -35,6 +36,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   List<ShipmentDestinationModel> _destinationOptions = [];
   bool _showDestinationOptions = false;
   bool _searchingDestination = false;
+  bool _locating = false;
+  String? _locationError;
   Timer? _debounce;
   String? _errorMessage;
 
@@ -92,6 +95,61 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         if (mounted) setState(() => _searchingDestination = false);
       }
     });
+  }
+
+  /// Padanan `useMyLocation()` di web -- tanpa bagian peta interaktifnya
+  /// (klik/drag pin), yang butuh dependency peta terpisah. Hanya mengisi
+  /// alamat + lat/lng; kecamatan/kota tetap dipilih lewat pencarian
+  /// destinasi Komerce di atas, tidak diambil dari hasil reverse-geocode
+  /// (Nominatim dan Komerce tidak berbagi ID kota).
+  Future<void> _useCurrentLocation() async {
+    setState(() {
+      _locating = true;
+      _locationError = null;
+    });
+
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw 'Aktifkan layanan lokasi di perangkatmu.';
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw 'Izin lokasi ditolak. Isi alamat secara manual.';
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      final result = await ref
+          .read(shipmentRepositoryProvider)
+          .reverseGeocode(position.latitude, position.longitude);
+
+      if (!mounted) return;
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        if (result != null && _addressController.text.trim().isEmpty) {
+          _addressController.text = result.streetAddress;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _locationError =
+            e is String ? e : 'Gagal mengambil lokasi. Isi alamat secara manual.';
+      });
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
   }
 
   void _selectDestination(ShipmentDestinationModel destination) {
@@ -245,6 +303,29 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   decoration: const InputDecoration(labelText: 'Alamat Lengkap'),
                   validator: (v) => (v == null || v.isEmpty) ? 'Alamat wajib diisi' : null,
                 ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _locating ? null : _useCurrentLocation,
+                    icon: _locating
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const AppIcon(AppIcons.mapPin, size: AppIconSize.sm),
+                    label: Text(_locating ? 'Mengambil lokasi...' : 'Gunakan lokasi saat ini'),
+                  ),
+                ),
+                if (_locationError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, bottom: 4),
+                    child: Text(
+                      _locationError!,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626)),
+                    ),
+                  ),
                 const SizedBox(height: 12),
 
                 CheckboxListTile(

@@ -3,6 +3,9 @@
     <!-- Android 13+ requires this explicit runtime permission before any
          notification (including FCM push) can actually be shown. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Alamat: "Gunakan lokasi saat ini" -> reverse-geocode via geolocator. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:label="Blukios"
