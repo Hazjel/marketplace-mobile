@@ -29,6 +29,10 @@ class AppIcons {
   static const String wallet = '$_base/wallet.svg';
   static const String truck = '$_base/truck.svg';
 
+  // Asisten AI (chatbot RAG)
+  static const String bot = '$_base/bot.svg';
+  static const String send = '$_base/send.svg';
+
   // Search & filter
   static const String search = '$_base/search.svg';
   static const String searchEmpty = '$_base/search_x.svg';

@@ -207,8 +207,33 @@ class _HomeHeader extends StatelessWidget {
         children: [
           const Expanded(child: _SearchField()),
           const SizedBox(width: AppTheme.spacingSM),
+          const _AiChatButton(),
           _CartButton(count: cartCount),
         ],
+      ),
+    );
+  }
+}
+
+/// Jalan masuk ke chatbot. Di web tombolnya melayang di sudut layar; di sini
+/// dipasang di header supaya tidak menutupi kartu produk pada layar sempit.
+class _AiChatButton extends StatelessWidget {
+  const _AiChatButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.aiChat),
+      child: const SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: AppIcon(
+            AppIcons.bot,
+            size: AppIconSize.lg,
+            semanticsLabel: 'Tanya asisten Ri',
+          ),
+        ),
       ),
     );
   }

@@ -14,6 +14,7 @@ import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
 import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
+import 'package:blukios_marketplace/features/ai_chat/screens/ai_chat_screen.dart';
 import 'package:blukios_marketplace/features/chat/screens/chat_list_screen.dart';
 import 'package:blukios_marketplace/features/chat/screens/chat_thread_screen.dart';
 import 'package:blukios_marketplace/features/dashboard/screens/dashboard_screen.dart';
@@ -70,6 +71,9 @@ class AppRoutes {
   static const String dashboard = '/account/dashboard';
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
+
+  /// Chatbot RAG (chat-service), bukan chat antar pengguna di atas.
+  static const String aiChat = '/ai-chat';
   static const String reviewForm = '/review/:transactionId/:productId';
 
   // Seller Centre — full-screen pushes from the "Toko Saya"/"Jualan"
@@ -285,6 +289,11 @@ class AppRoutes {
           path: chatList,
           parentNavigatorKey: _rootNavigatorKey,
           builder: (_, __) => const ChatListScreen(),
+        ),
+        GoRoute(
+          path: aiChat,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const AiChatScreen(),
         ),
         GoRoute(
           path: chatThread,

@@ -9,6 +9,20 @@ class ApiConfig {
     defaultValue: 'https://blukios.store/api',
   );
 
+  // chat-service (FastAPI) tidak berada di bawah /api: nginx meneruskan /ai/*
+  // ke service itu setelah membuang prefiksnya. Default-nya diturunkan dari
+  // [baseUrl] supaya build yang menunjuk server testing ikut pindah tanpa flag
+  // kedua, dan tetap bisa ditimpa:
+  //   flutter run --dart-define=AI_BASE_URL=http://10.0.2.2:8001
+  static const String _aiBaseUrlOverride = String.fromEnvironment('AI_BASE_URL');
+  static String get aiBaseUrl => _aiBaseUrlOverride.isNotEmpty
+      ? _aiBaseUrlOverride
+      : Uri.parse(baseUrl).replace(path: '/ai').toString();
+
+  // Jawaban LLM jauh lebih lambat dari endpoint CRUD, jadi batasnya sendiri.
+  static const Duration aiReceiveTimeout = Duration(seconds: 90);
+  static const String aiPredict = '/predict';
+
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 
