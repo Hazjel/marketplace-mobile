@@ -54,7 +54,11 @@ class ApiConfig {
   static const String address = '/address';
   static const String shipmentDestination = '/shipment/destination';
   static const String shipmentCalculate = '/shipment/calculate';
+  static const String shipmentGeocode = '/shipment/geocode';
+  static const String shipmentReverseGeocode = '/shipment/reverse-geocode';
   static const String health = '/health';
+  static const String passwordForgot = '/password/forgot';
+  static const String emailResend = '/email/resend';
 
   static String transactionCheckStatus(String id) => '/transaction/$id/check-status';
 

@@ -211,6 +211,42 @@ class AuthNotifier extends Notifier<AuthData> {
       // already gone either way.
     }
   }
+
+  /// Returns null on success, the error message otherwise. Caller shows a
+  /// generic "kalau email terdaftar, link sudah dikirim" success state
+  /// regardless of the actual outcome per email enumeration -- but the
+  /// backend here does validate `exists:users,email`, so a real error
+  /// (invalid email, throttled) is still worth surfacing.
+  Future<String?> forgotPassword(String email) async {
+    try {
+      await ref.read(authRepositoryProvider).forgotPassword(email);
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> resendVerification() async {
+    try {
+      await ref.read(authRepositoryProvider).resendVerification();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Unlike [logout], this must not resolve to unauthenticated before the
+  /// server confirms: a failed delete that logs the user out locally makes
+  /// them think their account is gone when it isn't.
+  Future<String?> deleteAccount() async {
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+      state = const AuthData(state: AuthState.unauthenticated);
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
 }
 
 final authProvider = NotifierProvider<AuthNotifier, AuthData>(AuthNotifier.new);

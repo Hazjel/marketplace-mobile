@@ -64,6 +64,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         padding: const EdgeInsets.only(bottom: AppTheme.spacingXL),
         children: [
           _ProfileCard(state: state, muted: muted),
+          if (state.user != null && !state.user!.isEmailVerified)
+            const _VerifyEmailBanner(),
           const SizedBox(height: AppTheme.spacingSM),
 
           isSeller
@@ -191,6 +193,86 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               label: const Text('Keluar'),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spacingLG,
+              AppTheme.spacingSM,
+              AppTheme.spacingLG,
+              0,
+            ),
+            child: TextButton(
+              onPressed: () => context.push(AppRoutes.deleteAccount),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+              child: const Text('Hapus Akun'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerifyEmailBanner extends ConsumerStatefulWidget {
+  const _VerifyEmailBanner();
+
+  @override
+  ConsumerState<_VerifyEmailBanner> createState() => _VerifyEmailBannerState();
+}
+
+class _VerifyEmailBannerState extends ConsumerState<_VerifyEmailBanner> {
+  bool _isSending = false;
+  bool _sent = false;
+
+  Future<void> _resend() async {
+    setState(() => _isSending = true);
+    final error = await ref.read(authProvider.notifier).resendVerification();
+    if (!mounted) return;
+    setState(() {
+      _isSending = false;
+      _sent = error == null;
+    });
+    if (error != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mengirim: $error'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLG),
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXLCard),
+      ),
+      child: Row(
+        children: [
+          const AppIcon(AppIcons.alert, color: AppTheme.warning, size: AppIconSize.md),
+          const SizedBox(width: AppTheme.spacingSM),
+          Expanded(
+            child: Text(
+              _sent
+                  ? 'Link verifikasi terkirim, cek email kamu.'
+                  : 'Email kamu belum diverifikasi.',
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ),
+          if (!_sent)
+            TextButton(
+              onPressed: _isSending ? null : _resend,
+              child: _isSending
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Kirim ulang', style: TextStyle(fontSize: 12.5)),
+            ),
         ],
       ),
     );

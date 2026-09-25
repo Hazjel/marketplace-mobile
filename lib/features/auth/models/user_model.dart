@@ -8,12 +8,15 @@ class UserModel {
   final String? token;
   final List<String>? permissions;
   final BuyerMini? buyer;
+  final String? emailVerifiedAt;
 
   /// Settings maps returned by `GET /me` and `PUT /profile/settings`.
   /// The API key-filters these against its own defaults, so unknown keys
   /// are dropped server-side and partial updates preserve the rest.
   final Map<String, bool> notificationPrefs;
   final Map<String, bool> privacyPrefs;
+
+  bool get isEmailVerified => emailVerifiedAt != null;
 
   UserModel({
     required this.id,
@@ -25,6 +28,7 @@ class UserModel {
     this.token,
     this.permissions,
     this.buyer,
+    this.emailVerifiedAt,
     this.notificationPrefs = const {},
     this.privacyPrefs = const {},
   });
@@ -42,6 +46,7 @@ class UserModel {
           ? List<String>.from(json['permissions'])
           : null,
       buyer: json['buyer'] != null ? BuyerMini.fromJson(json['buyer']) : null,
+      emailVerifiedAt: json['email_verified_at']?.toString(),
       notificationPrefs: _boolMap(json['notification_prefs']),
       privacyPrefs: _boolMap(json['privacy_prefs']),
     );

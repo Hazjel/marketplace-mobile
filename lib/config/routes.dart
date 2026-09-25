@@ -2,11 +2,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:blukios_marketplace/features/account/screens/account_screen.dart';
+import 'package:blukios_marketplace/features/account/screens/delete_account_screen.dart';
 import 'package:blukios_marketplace/features/account/screens/edit_profile_screen.dart';
 import 'package:blukios_marketplace/features/account/screens/settings_screen.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
 import 'package:blukios_marketplace/features/address/screens/address_form_screen.dart';
 import 'package:blukios_marketplace/features/address/screens/address_list_screen.dart';
+import 'package:blukios_marketplace/features/auth/screens/forgot_password_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/login_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/register_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/splash_screen.dart';
@@ -47,6 +49,7 @@ class AppRoutes {
   // Auth (outside the shell)
   static const String login = '/login';
   static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
 
   // Bottom-nav destinations
   static const String home = '/';
@@ -67,6 +70,7 @@ class AppRoutes {
   static const String editProfile = '/account/edit';
   static const String notificationSettings = '/account/notifications';
   static const String privacySettings = '/account/privacy';
+  static const String deleteAccount = '/account/delete-account';
   static const String storeDetail = '/store/:username';
   static const String dashboard = '/account/dashboard';
   static const String chatList = '/chat';
@@ -134,6 +138,10 @@ class AppRoutes {
       routes: [
         GoRoute(path: login, builder: (_, __) => const LoginScreen()),
         GoRoute(path: register, builder: (_, __) => const RegisterScreen()),
+        GoRoute(
+          path: forgotPassword,
+          builder: (_, __) => const ForgotPasswordScreen(),
+        ),
 
         // Five-tab shell. `indexedStack` keeps each branch's navigation
         // stack and scroll position alive across tab switches.
@@ -270,6 +278,11 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (_, __) =>
               const SettingsScreen(group: SettingsGroup.privacy),
+        ),
+        GoRoute(
+          path: deleteAccount,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const DeleteAccountScreen(),
         ),
         GoRoute(
           path: dashboard,

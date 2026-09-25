@@ -144,4 +144,74 @@ void main() {
       expect(state.currentUser, isNull);
     });
   });
+
+  group('forgotPassword', () {
+    test('success returns null', () async {
+      when(() => authRepository.forgotPassword('budi@test.com'))
+          .thenAnswer((_) async {});
+
+      final error =
+          await container.read(authProvider.notifier).forgotPassword('budi@test.com');
+
+      expect(error, isNull);
+    });
+
+    test('ApiException failure returns the message', () async {
+      when(() => authRepository.forgotPassword(any()))
+          .thenThrow(ApiException(message: 'Email tidak terdaftar'));
+
+      final error =
+          await container.read(authProvider.notifier).forgotPassword('x@test.com');
+
+      expect(error, 'Email tidak terdaftar');
+    });
+  });
+
+  group('resendVerification', () {
+    test('success returns null', () async {
+      when(() => authRepository.resendVerification()).thenAnswer((_) async {});
+
+      final error = await container.read(authProvider.notifier).resendVerification();
+
+      expect(error, isNull);
+    });
+
+    test('ApiException failure returns the message', () async {
+      when(() => authRepository.resendVerification())
+          .thenThrow(ApiException(message: 'Gagal mengirim'));
+
+      final error = await container.read(authProvider.notifier).resendVerification();
+
+      expect(error, 'Gagal mengirim');
+    });
+  });
+
+  group('deleteAccount', () {
+    test('success clears the session', () async {
+      when(() => authRepository.login(any(), any())).thenAnswer((_) async => testUser);
+      await container.read(authProvider.notifier).login('budi@test.com', 'password123');
+      when(() => authRepository.deleteAccount()).thenAnswer((_) async {});
+
+      final error = await container.read(authProvider.notifier).deleteAccount();
+
+      final state = container.read(authProvider);
+      expect(error, isNull);
+      expect(state.state, AuthState.unauthenticated);
+      expect(state.currentUser, isNull);
+    });
+
+    test('failure keeps the session authenticated so the user can retry', () async {
+      when(() => authRepository.login(any(), any())).thenAnswer((_) async => testUser);
+      await container.read(authProvider.notifier).login('budi@test.com', 'password123');
+      when(() => authRepository.deleteAccount())
+          .thenThrow(ApiException(message: 'Gagal menghapus akun'));
+
+      final error = await container.read(authProvider.notifier).deleteAccount();
+
+      final state = container.read(authProvider);
+      expect(error, 'Gagal menghapus akun');
+      expect(state.state, AuthState.authenticated);
+      expect(state.currentUser, isNotNull);
+    });
+  });
 }

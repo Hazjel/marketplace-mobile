@@ -263,7 +263,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                     onFieldSubmitted: (_) => _handleLogin(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => context.push(AppRoutes.forgotPassword),
+                      child: const Text(
+                        'Lupa password?',
+                        style: TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Login button
                   SizedBox(

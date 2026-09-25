@@ -48,4 +48,20 @@ class AuthRepository {
     await _apiClient.post(ApiConfig.logout);
     await SecureStorage.clearAll();
   }
+
+  /// Meminta link reset password. Link-nya sendiri, dari email, membuka
+  /// halaman reset di web (belum ada infra deep-link terverifikasi untuk
+  /// itu) -- yang di sini murni memicu pengiriman email-nya.
+  Future<void> forgotPassword(String email) async {
+    await _apiClient.post(ApiConfig.passwordForgot, data: {'email': email});
+  }
+
+  Future<void> resendVerification() async {
+    await _apiClient.post(ApiConfig.emailResend);
+  }
+
+  Future<void> deleteAccount() async {
+    await _apiClient.delete(ApiConfig.profile);
+    await SecureStorage.clearAll();
+  }
 }
