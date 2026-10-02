@@ -92,6 +92,25 @@ class SellerOrderDetailNotifier
       return false;
     }
   }
+
+  /// Rejects a paid, not-yet-shipped order; the API refunds the buyer.
+  /// Returns true on success.
+  Future<bool> cancel({required String reason}) async {
+    state = state.copyWith(isUpdating: true, clearUpdateError: true);
+
+    try {
+      final updated = await ref
+          .read(transactionRepositoryProvider)
+          .cancelOrder(id: arg, reason: reason);
+      if (_disposed) return false;
+      state = state.copyWith(order: updated, isUpdating: false);
+      return true;
+    } catch (e) {
+      if (_disposed) return false;
+      state = state.copyWith(isUpdating: false, updateError: e.toString());
+      return false;
+    }
+  }
 }
 
 final sellerOrderDetailProvider = AutoDisposeNotifierProviderFamily<

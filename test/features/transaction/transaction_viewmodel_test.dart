@@ -137,4 +137,59 @@ void main() {
       expect(container.read(transactionProvider).transactions.single.deliveryStatus, 'delivering');
     });
   });
+
+  group('submitRefundAccount', () {
+    TransactionModel cancelled({RefundAccount? account}) => TransactionModel(
+          id: 't1',
+          code: 'TRX-t1',
+          shippingCost: 5000,
+          deliveryStatus: 'cancelled',
+          tax: 0,
+          serviceFee: 1000,
+          grandTotal: 26000,
+          paymentStatus: 'failed',
+          transactionDetails: const [],
+          refundStatus: 'manual_required',
+          refundAccount: account,
+        );
+
+    Future<String?> submit() => container.read(transactionProvider.notifier).submitRefundAccount(
+          't1',
+          bankName: 'BCA',
+          accountNumber: '1234567890',
+          accountName: 'Budi',
+        );
+
+    void stubRepository(Future<TransactionModel> Function() answer) {
+      when(() => transactionRepository.submitRefundAccount(
+            id: 't1',
+            bankName: 'BCA',
+            accountNumber: '1234567890',
+            accountName: 'Budi',
+          )).thenAnswer((_) => answer());
+    }
+
+    setUp(() async {
+      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [cancelled()]);
+      await container.read(transactionProvider.notifier).loadTransactions();
+    });
+
+    test('stores the account the server returns', () async {
+      const account = RefundAccount(bankName: 'BCA', accountNumber: '1234567890', accountName: 'Budi');
+      stubRepository(() async => cancelled(account: account));
+
+      expect(await submit(), isNull);
+      expect(
+        container.read(transactionProvider).transactions.single.refundAccount?.accountNumber,
+        '1234567890',
+      );
+    });
+
+    test('failure returns the error message without changing state', () async {
+      stubRepository(() async => throw Exception('Pesanan ini tidak membutuhkan rekening refund'));
+
+      expect(await submit(), contains('tidak membutuhkan rekening refund'));
+      expect(container.read(transactionProvider).transactions.single.refundAccount, isNull);
+    });
+  });
 }

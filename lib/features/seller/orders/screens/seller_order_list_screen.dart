@@ -208,6 +208,7 @@ class _StatusBadge extends StatelessWidget {
       'completed' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
       'delivering' => (const Color(0xFFDBEAFE), const Color(0xFF2563EB)),
       'processing' => (const Color(0xFFFEF9C3), const Color(0xFFCA8A04)),
+      'cancelled' => (const Color(0xFFFEE2E2), const Color(0xFFDC2626)),
       _ => (const Color(0xFFF3F4F6), const Color(0xFF6B7280)),
     };
 

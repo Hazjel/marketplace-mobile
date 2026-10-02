@@ -139,6 +139,31 @@ class TransactionNotifier extends Notifier<TransactionData> {
       return e.toString();
     }
   }
+
+  /// Saves where a manual refund (bank VA payment) should be transferred.
+  /// Returns an error message, or null on success.
+  Future<String?> submitRefundAccount(
+    String id, {
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+  }) async {
+    try {
+      final updated = await ref.read(transactionRepositoryProvider).submitRefundAccount(
+            id: id,
+            bankName: bankName,
+            accountNumber: accountNumber,
+            accountName: accountName,
+          );
+      state = state.copyWith(
+        transactions:
+            state.transactions.map((t) => t.id == id ? updated : t).toList(),
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
 }
 
 final transactionProvider =

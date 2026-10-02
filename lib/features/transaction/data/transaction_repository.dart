@@ -142,4 +142,38 @@ class TransactionRepository {
     final response = await _apiClient.post('${ApiConfig.transactions}/$id/complete', data: data);
     return TransactionModel.fromJson(response.data['data']);
   }
+
+  /// Seller rejects a paid order that has not shipped — `POST
+  /// /transaction/{id}/cancel`. The API restores stock, reverses the
+  /// escrow and refunds the buyer (automatically, or manually for bank VA).
+  /// [reason] is shown to the buyer; the API requires 5–255 characters.
+  Future<TransactionModel> cancelOrder({
+    required String id,
+    required String reason,
+  }) async {
+    final response = await _apiClient.post(
+      ApiConfig.transactionCancel(id),
+      data: {'reason': reason},
+    );
+    return TransactionModel.fromJson(response.data['data']);
+  }
+
+  /// Buyer gives the bank account for a manual refund (`refund_status` =
+  /// `manual_required`) — `POST /transaction/{id}/refund-account`.
+  Future<TransactionModel> submitRefundAccount({
+    required String id,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+  }) async {
+    final response = await _apiClient.post(
+      ApiConfig.transactionRefundAccount(id),
+      data: {
+        'refund_bank_name': bankName,
+        'refund_account_number': accountNumber,
+        'refund_account_name': accountName,
+      },
+    );
+    return TransactionModel.fromJson(response.data['data']);
+  }
 }

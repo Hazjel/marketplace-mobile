@@ -61,6 +61,8 @@ class ApiConfig {
   static const String emailResend = '/email/resend';
 
   static String transactionCheckStatus(String id) => '/transaction/$id/check-status';
+  static String transactionCancel(String id) => '/transaction/$id/cancel';
+  static String transactionRefundAccount(String id) => '/transaction/$id/refund-account';
 
   // Search & filters (3a)
   static const String productSearch = '/product/all/paginated';

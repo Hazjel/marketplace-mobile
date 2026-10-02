@@ -85,6 +85,31 @@ class _SellerOrderDetailScreenState
     }
   }
 
+  /// Asks for the reason the buyer will see, then rejects the order. The
+  /// API refunds the buyer in full, so the dialog says so up front.
+  Future<void> _rejectOrder() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const _RejectOrderDialog(),
+    );
+    if (reason == null || !mounted) return;
+
+    final success = await ref
+        .read(sellerOrderDetailProvider(widget.orderId).notifier)
+        .cancel(reason: reason);
+    if (!mounted) return;
+
+    final error = ref.read(sellerOrderDetailProvider(widget.orderId)).updateError;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Pesanan ditolak, dana pembeli sedang dikembalikan'
+            : error ?? 'Gagal menolak pesanan'),
+        backgroundColor: success ? null : AppTheme.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(sellerOrderDetailProvider(widget.orderId));
@@ -255,6 +280,43 @@ class _SellerOrderDetailScreenState
                                   ],
                                 ),
                               ),
+                            ] else if (order.deliveryStatus == 'cancelled') ...[
+                              _SectionCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const AppIcon(AppIcons.close, color: AppTheme.error),
+                                        const SizedBox(width: AppTheme.spacingSM),
+                                        Expanded(
+                                          child: Text('Pesanan dibatalkan', style: AppTheme.titleSm),
+                                        ),
+                                        if (order.refundStatus case final refund?)
+                                          _StatusBadge(
+                                            status: refund,
+                                            label: order.refundStatusLabel ?? refund,
+                                          ),
+                                      ],
+                                    ),
+                                    if (order.refundReason != null) ...[
+                                      const SizedBox(height: AppTheme.spacingSM),
+                                      Text(
+                                        'Alasan: ${order.refundReason}',
+                                        style: AppTheme.bodySm.copyWith(color: muted),
+                                      ),
+                                    ],
+                                    if (order.refundStatus != null) ...[
+                                      const SizedBox(height: AppTheme.spacingSM),
+                                      Text(
+                                        'Stok sudah dikembalikan dan dana pesanan ditarik dari saldo tertahan. '
+                                        'Pengembalian dana ke pembeli diurus Blukios.',
+                                        style: AppTheme.bodySm.copyWith(color: muted),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ] else ...[
                               _SectionCard(
                                 child: Column(
@@ -360,6 +422,22 @@ class _SellerOrderDetailScreenState
                                         ),
                                       ],
                                     ),
+                                    // Same rule as the API: paid and not shipped yet.
+                                    if (order.paymentStatus == 'paid' &&
+                                        const ['pending', 'processing']
+                                            .contains(order.deliveryStatus)) ...[
+                                      const SizedBox(height: AppTheme.spacingSM),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton(
+                                          onPressed: data.isUpdating ? null : _rejectOrder,
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: AppTheme.error,
+                                          ),
+                                          child: const Text('Tolak Pesanan'),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -368,6 +446,64 @@ class _SellerOrderDetailScreenState
                         ),
                       ),
       ),
+    );
+  }
+}
+
+class _RejectOrderDialog extends StatefulWidget {
+  const _RejectOrderDialog();
+
+  @override
+  State<_RejectOrderDialog> createState() => _RejectOrderDialogState();
+}
+
+class _RejectOrderDialogState extends State<_RejectOrderDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // The API accepts 5-255 characters.
+  bool get _valid => _controller.text.trim().length >= 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Tolak Pesanan?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Stok dikembalikan dan pembeli mendapat refund penuh.'),
+          const SizedBox(height: AppTheme.spacingMD),
+          TextField(
+            controller: _controller,
+            maxLength: 255,
+            maxLines: 3,
+            minLines: 1,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Alasan (dilihat pembeli)',
+              hintText: 'Contoh: stok habis',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        TextButton(
+          onPressed: _valid ? () => Navigator.of(context).pop(_controller.text.trim()) : null,
+          style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+          child: const Text('Tolak'),
+        ),
+      ],
     );
   }
 }
@@ -463,6 +599,9 @@ class _StatusBadge extends StatelessWidget {
       'completed' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
       'delivering' => (const Color(0xFFDBEAFE), const Color(0xFF2563EB)),
       'processing' => (const Color(0xFFFEF9C3), const Color(0xFFCA8A04)),
+      'cancelled' => (const Color(0xFFFEE2E2), const Color(0xFFDC2626)),
+      'refunded' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
+      'manual_required' => (const Color(0xFFFEF3C7), const Color(0xFFB45309)),
       _ => (const Color(0xFFF3F4F6), const Color(0xFF6B7280)),
     };
 
