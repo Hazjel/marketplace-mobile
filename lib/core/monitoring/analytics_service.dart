@@ -38,6 +38,17 @@ class AnalyticsService {
     }
   }
 
+  /// Records a framework error (build/layout/paint) to Crashlytics.
+  /// No-ops if Firebase never initialized.
+  static void recordFlutterError(FlutterErrorDetails details) {
+    if (!_initialized) return;
+    try {
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    } catch (e, st) {
+      debugPrint('AnalyticsService.recordFlutterError failed: $e\n$st');
+    }
+  }
+
   /// Records a non-fatal or fatal error to Crashlytics. Safe to call from
   /// anywhere — no-ops if Firebase never initialized.
   static void recordError(Object error, StackTrace? stack, {bool fatal = false}) {
