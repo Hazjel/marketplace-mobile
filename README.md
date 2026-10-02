@@ -142,6 +142,45 @@ Build pertama mengunduh image `ghcr.io/cirruslabs/flutter:stable` (beberapa GB) 
 server itu bisa lama. Setelahnya cache pub dan Gradle tersimpan di volume bernama
 (`blukios-mobile-pub-cache`, `blukios-mobile-gradle`), jadi build berikutnya jauh lebih cepat.
 
+## Rilis Android
+
+Rilis dibagikan sebagai APK bertanda tangan di
+[GitHub Releases](https://github.com/Hazjel/marketplace-mobile/releases).
+
+**Keystore rilis.** Android hanya memasang update yang ditandatangani kunci yang sama
+dengan versi terpasang. Kunci v1.0.0 sampai v1.1.4 hilang, jadi v1.2.0 memakai kunci baru
+dan pengguna lama harus uninstall sekali sebelum memasangnya. Simpan keystore dan
+passwordnya di dua tempat terpisah (mis. password manager dan penyimpanan cloud
+pribadi); jangan pernah di repo ini (`*.jks` dan `android/key.properties` di-gitignore).
+
+`android/key.properties` (lokal, tidak di-commit):
+
+```properties
+storePassword=...
+keyPassword=...
+keyAlias=blukios
+storeFile=C:/Users/<user>/.blukios-release/blukios-release.jks
+```
+
+Tanpa file ini build rilis jatuh ke kunci debug (lihat `android/app/build.gradle.kts`):
+APK-nya jalan, tapi jangan pernah dibagikan.
+
+**Membuat rilis:**
+
+```bash
+flutter test
+flutter build apk --release   # API default: https://blukios.store/api
+```
+
+Periksa tanda tangannya sebelum diunggah, sertifikatnya harus `CN=Blukios Marketplace`:
+
+```bash
+apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk
+```
+
+Lalu naikkan `version` di `pubspec.yaml` (versionCode harus selalu naik), buat tag
+`vX.Y.Z`, dan unggah APK ke GitHub Release dengan tag itu.
+
 ## Catatan Pengembangan
 
 - Token disimpan di `flutter_secure_storage` (encrypted)
