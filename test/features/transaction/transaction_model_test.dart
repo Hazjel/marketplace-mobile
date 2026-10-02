@@ -47,6 +47,35 @@ void main() {
       );
     });
 
+    test('parses the service fee and refund state', () {
+      final t = TransactionModel.fromJson(_fixture()
+        ..['tax'] = 0
+        ..['service_fee'] = 1000
+        ..['delivery_status'] = 'cancelled'
+        ..['payment_status'] = 'failed'
+        ..['refund_status'] = 'manual_required'
+        ..['refund_amount'] = 121006
+        ..['refund_reason'] = 'Stok habis'
+        ..['refund_account'] = {'bank_name': 'BCA', 'account_number': '1234567890', 'account_name': 'Budi'});
+
+      expect(t.serviceFee, 1000.0);
+      expect(t.refundAmount, 121006.0);
+      expect(t.refundStatusLabel, 'Menunggu Refund');
+      expect(t.awaitsManualRefund, isTrue);
+      expect(t.refundAccount?.accountNumber, '1234567890');
+      // The refund is still moving: keep listening for live updates.
+      expect(t.isTerminal, isFalse);
+    });
+
+    test('orders without refund fields parse as before', () {
+      final t = TransactionModel.fromJson(_fixture());
+
+      expect(t.serviceFee, 0.0);
+      expect(t.refundStatus, isNull);
+      expect(t.refundAmount, isNull);
+      expect(t.refundAccount, isNull);
+    });
+
     test('throws when a C1-contracted money field is missing', () {
       final json = _fixture()..remove('tax');
       expect(() => TransactionModel.fromJson(json), throwsA(isA<FormatException>()));

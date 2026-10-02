@@ -214,10 +214,22 @@ class _SellerOrderDetailScreenState
                                     label: 'Ongkos Kirim',
                                     value: CurrencyFormatter.formatRupiah(order.shippingCost),
                                   ),
-                                  _SummaryRow(
-                                    label: 'Pajak',
-                                    value: CurrencyFormatter.formatRupiah(order.tax),
-                                  ),
+                                  // Orders since 2026-10-02 carry no tax; only older ones show it.
+                                  if (order.tax > 0)
+                                    _SummaryRow(
+                                      label: 'PPN 11%',
+                                      value: CurrencyFormatter.formatRupiah(order.tax),
+                                    ),
+                                  if (order.discountAmount > 0)
+                                    _SummaryRow(
+                                      label: 'Diskon Voucher',
+                                      value: '-${CurrencyFormatter.formatRupiah(order.discountAmount)}',
+                                    ),
+                                  if (order.serviceFee > 0)
+                                    _SummaryRow(
+                                      label: 'Biaya Layanan',
+                                      value: CurrencyFormatter.formatRupiah(order.serviceFee),
+                                    ),
                                   const SizedBox(height: 4),
                                   _SummaryRow(
                                     label: 'Total Pesanan',

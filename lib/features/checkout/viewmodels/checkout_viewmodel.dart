@@ -39,12 +39,20 @@ class CheckoutData {
     this.voucherError,
   });
 
+  /// Flat platform fee per order, mirroring the API's
+  /// `marketplace.buyer_service_fee`. Buyers pay no 11% tax since
+  /// 2026-10-02; the server recomputes the real total on checkout.
+  static const double buyerServiceFee = 1000;
+
   double get subtotal => group.subtotal;
-  double get tax => (subtotal * 0.11).roundToDouble();
   double get shippingCost => selectedCourier?.shippingCostNet ?? 0;
   double get discountAmount => appliedVoucher?.discountAmount ?? 0;
+  double get serviceFee => buyerServiceFee;
+
+  /// Same order as TransactionRepository::create: the discount is clamped
+  /// before the service fee is added, so a voucher never reduces the fee.
   double get grandTotal =>
-      (subtotal + tax + shippingCost - discountAmount).clamp(0, double.infinity);
+      (subtotal + shippingCost - discountAmount).clamp(0, double.infinity) + serviceFee;
 
   CheckoutData copyWith({
     List<AddressModel>? savedAddresses,

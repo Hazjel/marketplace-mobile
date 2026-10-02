@@ -17,7 +17,9 @@ class TransactionModel {
   final String? trackingNumber;
   final String? deliveryProof;
   final String deliveryStatus;
+  /// Only on orders from before 2026-10-02; newer ones carry [serviceFee].
   final double tax;
+  final double serviceFee;
   final double grandTotal;
   final String? voucherId;
   final String? voucherCode;
@@ -26,6 +28,19 @@ class TransactionModel {
   final String? snapToken;
   final String? createdAt;
   final List<TransactionDetailModel> transactionDetails;
+
+  /// Refund for an order the seller rejected after payment: null when no
+  /// refund is owed, else `processing` | `manual_required` | `refunded`.
+  final String? refundStatus;
+  final String? refundMethod;
+  final double? refundAmount;
+  final String? refundReason;
+  final String? refundNote;
+  final String? refundedAt;
+
+  /// Bank account for a manual refund; the API only sends it to the buyer
+  /// who owns the order and to admins.
+  final RefundAccount? refundAccount;
 
   /// Product ids already reviewed within this transaction — from the
   /// `product_reviews` relation, present when the API loads it (e.g. on
@@ -50,6 +65,7 @@ class TransactionModel {
     this.deliveryProof,
     required this.deliveryStatus,
     required this.tax,
+    this.serviceFee = 0,
     required this.grandTotal,
     this.voucherId,
     this.voucherCode,
@@ -59,6 +75,13 @@ class TransactionModel {
     this.createdAt,
     required this.transactionDetails,
     this.reviewedProductIds = const {},
+    this.refundStatus,
+    this.refundMethod,
+    this.refundAmount,
+    this.refundReason,
+    this.refundNote,
+    this.refundedAt,
+    this.refundAccount,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -81,6 +104,7 @@ class TransactionModel {
       deliveryProof: json['delivery_proof'],
       deliveryStatus: json['delivery_status'] ?? 'pending',
       tax: json.moneyInt('tax').toDouble(),
+      serviceFee: (json.moneyIntOrNull('service_fee') ?? 0).toDouble(),
       grandTotal: json.moneyInt('grand_total').toDouble(),
       voucherId: json['voucher_id']?.toString(),
       voucherCode: json['voucher_code'],
@@ -99,6 +123,15 @@ class TransactionModel {
               .whereType<String>()
               .toSet()
           : const {},
+      refundStatus: json.asStringOrNull('refund_status'),
+      refundMethod: json.asStringOrNull('refund_method'),
+      refundAmount: json.moneyIntOrNull('refund_amount')?.toDouble(),
+      refundReason: json.asStringOrNull('refund_reason'),
+      refundNote: json.asStringOrNull('refund_note'),
+      refundedAt: json.asStringOrNull('refunded_at'),
+      refundAccount: json['refund_account'] is Map<String, dynamic>
+          ? RefundAccount.fromJson(json['refund_account'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -121,6 +154,7 @@ class TransactionModel {
       deliveryProof: deliveryProof,
       deliveryStatus: deliveryStatus,
       tax: tax,
+      serviceFee: serviceFee,
       grandTotal: grandTotal,
       voucherId: voucherId,
       voucherCode: voucherCode,
@@ -130,6 +164,13 @@ class TransactionModel {
       createdAt: createdAt,
       transactionDetails: transactionDetails,
       reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
+      refundStatus: refundStatus,
+      refundMethod: refundMethod,
+      refundAmount: refundAmount,
+      refundReason: refundReason,
+      refundNote: refundNote,
+      refundedAt: refundedAt,
+      refundAccount: refundAccount,
     );
   }
 
@@ -151,10 +192,32 @@ class TransactionModel {
   }
 
   /// No further status change is expected — safe to stop listening for
-  /// live updates on this order.
-  bool get isTerminal =>
-      deliveryStatus == 'completed' ||
-      const ['failed', 'cancelled', 'expired'].contains(paymentStatus);
+  /// live updates on this order. A cancelled order whose refund is still
+  /// moving keeps listening.
+  bool get isTerminal {
+    if (refundStatus != null) return refundStatus == 'refunded';
+    return deliveryStatus == 'completed' ||
+        deliveryStatus == 'cancelled' ||
+        const ['failed', 'cancelled', 'expired'].contains(paymentStatus);
+  }
+
+  /// Waiting for the platform to transfer by hand (bank VA payments).
+  bool get awaitsManualRefund => refundStatus == 'manual_required';
+
+  String? get refundStatusLabel {
+    switch (refundStatus) {
+      case null:
+        return null;
+      case 'processing':
+        return 'Refund Diproses';
+      case 'manual_required':
+        return 'Menunggu Refund';
+      case 'refunded':
+        return 'Dana Dikembalikan';
+      default:
+        return refundStatus;
+    }
+  }
 
   String get deliveryStatusLabel {
     switch (deliveryStatus) {
@@ -166,6 +229,8 @@ class TransactionModel {
         return 'Dikirim';
       case 'completed':
         return 'Selesai';
+      case 'cancelled':
+        return 'Dibatalkan';
       default:
         return deliveryStatus;
     }
@@ -198,6 +263,26 @@ class TransactionDetailModel {
       productThumbnail: product != null ? product['thumbnail'] : null,
       qty: (json['qty'] ?? 1) is int ? json['qty'] ?? 1 : (json['qty'] as num).toInt(),
       subtotal: json.moneyInt('subtotal').toDouble(),
+    );
+  }
+}
+
+class RefundAccount {
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+
+  const RefundAccount({
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+  });
+
+  factory RefundAccount.fromJson(Map<String, dynamic> json) {
+    return RefundAccount(
+      bankName: json.asStringOrNull('bank_name') ?? '',
+      accountNumber: json.asStringOrNull('account_number') ?? '',
+      accountName: json.asStringOrNull('account_name') ?? '',
     );
   }
 }

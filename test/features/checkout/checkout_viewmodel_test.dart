@@ -118,6 +118,30 @@ void main() {
     });
   });
 
+  // Must match TransactionRepository::create on the API, or the summary
+  // shows a different amount from what Midtrans charges.
+  group('totals', () {
+    final courier = CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne');
+
+    test('charge no tax and add the flat service fee', () {
+      final data = CheckoutData(group: _group(), selectedCourier: courier);
+
+      expect(data.subtotal, 20000);
+      expect(data.serviceFee, 1000);
+      expect(data.grandTotal, 26000); // 20000 + 5000 + 1000
+    });
+
+    test('a voucher never reduces the service fee', () {
+      final data = CheckoutData(
+        group: _group(),
+        selectedCourier: courier,
+        appliedVoucher: const VoucherModel(voucherId: 'v1', code: 'BESAR', discountAmount: 50000),
+      );
+
+      expect(data.grandTotal, 1000);
+    });
+  });
+
   group('selectAddress', () {
     test('resets any previously calculated shipping/courier', () async {
       when(() => addressRepository.getAddresses()).thenAnswer((_) async => [_address()]);

@@ -221,13 +221,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 children: [
                   _buildSummaryRow('Subtotal', viewModel.subtotal),
                   _buildSummaryRow('Ongkos Kirim', viewModel.shippingCost),
-                  _buildSummaryRow('PPN 11%', viewModel.tax),
                   if (viewModel.appliedVoucher != null)
                     _buildSummaryRow(
                       'Diskon Voucher',
                       viewModel.discountAmount,
                       isDiscount: true,
                     ),
+                  _buildSummaryRow('Biaya Layanan', viewModel.serviceFee),
                   const Divider(),
                   _buildSummaryRow('Total Tagihan', viewModel.grandTotal, isBold: true),
                 ],
