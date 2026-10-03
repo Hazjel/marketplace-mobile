@@ -30,25 +30,32 @@ def runInContainer(Map opts) {
     }
 }
 
-// Image Cirrus Labs: Flutter SDK + toolchain Android. Di-pin, bukan :stable --
-// rilis baru bisa membawa lint baru yang memerahkan build tanpa perubahan kode.
-// Cirrus tertinggal dari rilis Flutter (laptop rilis memakai 3.47.4, tag Cirrus
-// terbaru 3.44.0); pubspec.lock hanya butuh Flutter >= 3.38.4. Naikkan dengan
-// sengaja begitu tag yang lebih baru terbit.
-FLUTTER_IMAGE = 'ghcr.io/cirruslabs/flutter:3.44.0'
-
-// SDK di image dimiliki root (Dockerfile Cirrus: chown -R root:root /sdks/flutter).
-// Sebagai uid Jenkins, git menolak repo SDK ("dubious ownership") dan flutter tidak
-// bisa menulis lockfile cache-nya, jadi container jalan sebagai root (argumen -u
-// terakhir menang atas -u bawaan runInContainer). Akibatnya file yang dibuat di
-// workspace (.dart_tool, build/) milik root: setiap skrip mengembalikannya ke uid
-// Jenkins saat keluar, kalau tidak checkout berikutnya gagal menghapusnya.
-//
-// Cache pub dan Gradle di satu volume bernama: tanpa itu setiap build mengunduh
-// ulang semua dependency, dan di disk host ini itu bagian termahal dari build.
-CONTAINER_ARGS = '-u 0:0 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" ' +
-    '-e PUB_CACHE=/cache/pub -e GRADLE_USER_HOME=/cache/gradle -v blukios-mobile-ci-cache:/cache'
-RESTORE_OWNER = 'trap \'chown -R "$HOST_UID:$HOST_GID" .\' EXIT\n'
+// Semua stage Flutter lewat sini. Nilai tetapnya ditulis di dalam method, bukan
+// variabel global tanpa `def` (Jenkins memperingatkan field skrip seperti itu bisa
+// bocor memori, dan `def` di top-level tidak terlihat dari method).
+def flutterInContainer(String name, String extraArgs, String script) {
+    runInContainer(
+        name: name,
+        // Image Cirrus Labs: Flutter SDK + toolchain Android. Di-pin, bukan :stable --
+        // rilis baru bisa membawa lint baru yang memerahkan build tanpa perubahan kode.
+        // Cirrus tertinggal dari rilis Flutter (laptop rilis memakai 3.47.4, tag Cirrus
+        // terbaru 3.44.0); pubspec.lock hanya butuh Flutter >= 3.38.4. Naikkan dengan
+        // sengaja begitu tag yang lebih baru terbit.
+        image: 'ghcr.io/cirruslabs/flutter:3.44.0',
+        // SDK di image dimiliki root (Dockerfile Cirrus: chown -R root:root /sdks/flutter):
+        // sebagai uid lain, git menolak repo SDK ("dubious ownership") dan flutter tidak
+        // bisa menulis lockfile cache-nya, jadi container jalan sebagai root (argumen -u
+        // terakhir menang atas -u bawaan runInContainer). Cache pub dan Gradle di satu
+        // volume bernama: tanpa itu setiap build mengunduh ulang semua dependency.
+        args: '-u 0:0 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" ' +
+            '-e PUB_CACHE=/cache/pub -e GRADLE_USER_HOME=/cache/gradle ' +
+            '-v blukios-mobile-ci-cache:/cache ' + extraArgs,
+        // File yang dibuat di workspace (.dart_tool, build/) milik root; kembalikan ke uid
+        // agen Jenkins saat keluar supaya checkout berikutnya bisa menghapusnya. (fth-jenkins
+        // sendiri jalan sebagai root, jadi di server itu ini no-op.)
+        script: 'trap \'chown -R "$HOST_UID:$HOST_GID" .\' EXIT\n' + script
+    )
+}
 
 pipeline {
     agent none
@@ -81,17 +88,16 @@ pipeline {
             agent any
             steps {
                 checkout scm
-                runInContainer(
-                    name: 'analyze-test',
-                    image: FLUTTER_IMAGE,
-                    args: CONTAINER_ARGS,
-                    script: RESTORE_OWNER + '''
-                        flutter --version
-                        flutter pub get --enforce-lockfile
-                        flutter analyze
-                        flutter test
-                    '''
-                )
+                // Bukan --enforce-lockfile: pubspec.lock dibuat Flutter 3.47.4 di laptop,
+                // dan paket yang versinya dipatok SDK (matcher, meta, test_api,
+                // vector_math) berbeda di 3.44.0 -- build #1 gagal di situ. Dependency
+                // aplikasi tetap mengikuti lockfile; hanya paket bawaan SDK yang menyesuaikan.
+                flutterInContainer('analyze-test', '', '''
+                    flutter --version
+                    flutter pub get
+                    flutter analyze
+                    flutter test
+                ''')
             }
         }
 
@@ -106,12 +112,8 @@ pipeline {
                 // diterbitkan dari laptop ke GitHub Releases (README bagian Release).
                 // NDK tidak ada di image dan diunduh Gradle saat pertama dibutuhkan;
                 // volume sendiri supaya unduhan itu tidak terulang tiap build.
-                runInContainer(
-                    name: 'build-apk',
-                    image: FLUTTER_IMAGE,
-                    args: CONTAINER_ARGS + ' -v blukios-mobile-ci-ndk:/opt/android-sdk-linux/ndk',
-                    script: RESTORE_OWNER + 'flutter build apk --debug\n'
-                )
+                flutterInContainer('build-apk', '-v blukios-mobile-ci-ndk:/opt/android-sdk-linux/ndk',
+                    'flutter build apk --debug\n')
             }
         }
 

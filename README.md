@@ -118,7 +118,7 @@ Untuk mengaktifkan:
 
 ## CI/CD
 
-Jenkins (server yang sama dengan repo web) menjalankan `flutter pub get --enforce-lockfile`,
+Jenkins (server yang sama dengan repo web) menjalankan `flutter pub get`,
 `flutter analyze`, dan `flutter test` di setiap push ke `main` (polling 5 menit). Build APK
 debug tidak ikut otomatis karena berat di disk server yang dipakai bersama pipeline tim lain:
 centang `BUILD_DEBUG_APK` di "Build with Parameters" kalau perlu (mis. setelah upgrade
