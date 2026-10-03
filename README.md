@@ -2,7 +2,7 @@
 
 Aplikasi mobile marketplace berbasis Flutter yang terintegrasi dengan Laravel 12 API (api-blue).
 
-CI/CD: Jenkins (`Jenkinsfile` di root repo ini), server sama dengan yang dipakai repo web. Job-nya masih harus didaftarkan manual di server, lihat [CI/CD](#cicd).
+CI/CD: Jenkins (`Jenkinsfile` di root repo ini), server sama dengan yang dipakai repo web; job-nya didaftarkan sekali, lihat [CI/CD](#cicd).
 
 ## Arsitektur
 
@@ -118,29 +118,34 @@ Untuk mengaktifkan:
 
 ## CI/CD
 
-`Jenkinsfile` sudah ada di repo ini, tapi **belum ada job-nya di server Jenkins**, jadi
-`flutter analyze` dan `flutter test` tidak pernah jalan otomatis. Pendaftaran job butuh
-akses admin Jenkins (API anonim ditolak 403).
+Jenkins (server yang sama dengan repo web) menjalankan `flutter pub get --enforce-lockfile`,
+`flutter analyze`, dan `flutter test` di setiap push ke `main` (polling 5 menit). Build APK
+debug tidak ikut otomatis karena berat di disk server yang dipakai bersama pipeline tim lain:
+centang `BUILD_DEBUG_APK` di "Build with Parameters" kalau perlu (mis. setelah upgrade
+Gradle/AGP). APK rilis tetap dibuat dan di-sign dari laptop, lihat [Rilis Android](#rilis-android).
 
-Dua cara memasangnya, pilih salah satu.
+**Mendaftarkan job (sekali).** Jenkins memakai "Full Control Once Logged In": akun Jenkins
+mana pun bisa membuat job, tidak perlu admin. Pilih salah satu:
 
-**Lewat UI:** New Item, nama `blukios-mobile-pipeline`, tipe Pipeline. Di bagian Pipeline
-pilih "Pipeline script from SCM", SCM Git, URL `https://github.com/Hazjel/marketplace-mobile.git`,
-branch `*/main`, Script Path `Jenkinsfile`. Tanpa credential, repo ini publik.
+- **UI:** New Item, nama `blukios-mobile-pipeline`, tipe Pipeline. Di bagian Pipeline pilih
+  "Pipeline script from SCM", SCM Git, URL `https://github.com/Hazjel/marketplace-mobile.git`,
+  branch `*/main`, Script Path `Jenkinsfile`. Tanpa credential, repo ini publik. Simpan, lalu
+  Build Now sekali: parameter `BUILD_DEBUG_APK` dan polling baru terdaftar setelah build pertama.
+- **File config** ([ci/jenkins-job.xml](ci/jenkins-job.xml)), dijalankan di host Jenkins, lalu
+  Manage Jenkins, Reload Configuration from Disk. Jangan me-restart container Jenkins:
+  pipeline project lain hidup di server yang sama.
 
-**Lewat file config** ([ci/jenkins-job.xml](ci/jenkins-job.xml)), dijalankan di host Jenkins:
+  ```bash
+  docker exec fth-jenkins mkdir -p /var/jenkins_home/jobs/blukios-mobile-pipeline
+  docker cp ci/jenkins-job.xml fth-jenkins:/var/jenkins_home/jobs/blukios-mobile-pipeline/config.xml
+  ```
 
-```bash
-docker exec fth-jenkins mkdir -p /var/jenkins_home/jobs/blukios-mobile-pipeline
-docker cp ci/jenkins-job.xml fth-jenkins:/var/jenkins_home/jobs/blukios-mobile-pipeline/config.xml
-```
-
-Jenkins membaca job baru setelah Manage Jenkins, Reload Configuration from Disk. Jangan
-me-restart container Jenkins untuk ini: pipeline project lain hidup di server yang sama.
-
-Build pertama mengunduh image `ghcr.io/cirruslabs/flutter:stable` (beberapa GB) dan di disk
-server itu bisa lama. Setelahnya cache pub dan Gradle tersimpan di volume bernama
-(`blukios-mobile-pub-cache`, `blukios-mobile-gradle`), jadi build berikutnya jauh lebih cepat.
+**Image dan cache.** `ghcr.io/cirruslabs/flutter:3.44.0`, di-pin (Cirrus belum menerbitkan
+tag 3.47; `pubspec.lock` butuh Flutter >= 3.38.4). Build pertama mengunduh image itu (2,3 GB
+terkompresi, sekitar 7 GB di disk) dan bisa lama. Cache pub dan Gradle ada di volume
+`blukios-mobile-ci-cache`, NDK untuk build APK di `blukios-mobile-ci-ndk`. Container jalan
+sebagai root karena SDK di image milik root; skrip mengembalikan kepemilikan workspace ke
+Jenkins setiap selesai.
 
 ## Rilis Android
 

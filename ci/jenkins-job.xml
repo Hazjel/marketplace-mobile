@@ -5,7 +5,7 @@
   Tidak memuat kredensial: repo ini publik, jadi checkout tanpa credentialsId.
 -->
 <flow-definition plugin="workflow-job">
-  <description>Blukios Marketplace mobile (Flutter): analyze, test, dan debug APK smoke build.</description>
+  <description>Blukios Marketplace mobile (Flutter): analyze dan test setiap push; APK debug lewat parameter BUILD_DEBUG_APK.</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <jenkins.model.BuildDiscarderProperty>
