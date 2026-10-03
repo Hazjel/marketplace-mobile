@@ -10,6 +10,18 @@ class StoreRepository {
 
   StoreRepository(this._apiClient);
 
+  /// The web's "Semua Toko" list: up to 100 active stores, filtered on the
+  /// client like the web does (`fe-blue/src/views/App/AllStores.vue`).
+  Future<List<StoreModel>> getAll() async {
+    final response =
+        await _apiClient.get(ApiConfig.stores, queryParameters: {'limit': 100});
+    final data = response.data['data'];
+    if (data is! List) return const [];
+    return data
+        .map((json) => StoreModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Returns null when the store doesn't exist. The API answers 404 with
   /// `success: true, data: null`, so absence is signalled by the payload,
   /// not the status flag.

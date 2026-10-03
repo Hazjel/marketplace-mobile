@@ -8,6 +8,14 @@ import 'package:blukios_marketplace/features/account/viewmodels/account_viewmode
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
+import 'package:blukios_marketplace/config/api_config.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Opens a storefront page (same host as the API) in the browser.
+Future<void> _openWebPage(String path) => launchUrl(
+      Uri.parse('${ApiConfig.baseUrl.replaceAll('/api', '')}$path'),
+      mode: LaunchMode.externalApplication,
+    );
 
 class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
@@ -164,6 +172,29 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 icon: AppIcons.shield,
                 label: 'Privasi',
                 onTap: () => context.push(AppRoutes.privacySettings),
+              ),
+            ],
+          ),
+
+          // The same pages as the web footer; Play Store also requires a
+          // reachable privacy policy.
+          _MenuSection(
+            title: 'Informasi',
+            children: [
+              _MenuTile(
+                icon: AppIcons.store,
+                label: 'Tentang Blukios',
+                onTap: () => _openWebPage('/about'),
+              ),
+              _MenuTile(
+                icon: AppIcons.lock,
+                label: 'Kebijakan Privasi',
+                onTap: () => _openWebPage('/privacy'),
+              ),
+              _MenuTile(
+                icon: AppIcons.layers,
+                label: 'Syarat & Ketentuan',
+                onTap: () => _openWebPage('/terms'),
               ),
             ],
           ),

@@ -104,6 +104,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SliverToBoxAdapter(
                   child: _CategoryStrip(categories: viewModel.categories),
                 ),
+              SliverToBoxAdapter(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingLG),
+                  leading: const AppIcon(AppIcons.store),
+                  title: Text('Semua Toko', style: AppTheme.titleSm),
+                  subtitle: const Text('Jelajahi toko di Blukios'),
+                  trailing:
+                      const AppIcon(AppIcons.chevronRight, size: AppIconSize.sm),
+                  onTap: () => context.push(AppRoutes.stores),
+                ),
+              ),
               const SliverToBoxAdapter(child: _PersonalizedRecommendationsSection()),
               const SliverToBoxAdapter(
                 child: _SectionHeader(title: 'Produk Terbaru'),

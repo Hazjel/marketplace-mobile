@@ -11,6 +11,10 @@ final storeRepositoryProvider = Provider<StoreRepository>(
   (ref) => StoreRepository(ref.watch(apiClientProvider)),
 );
 
+final allStoresProvider = FutureProvider.autoDispose<List<StoreModel>>(
+  (ref) => ref.watch(storeRepositoryProvider).getAll(),
+);
+
 class StoreData {
   final StoreModel? store;
   final List<ProductModel> products;

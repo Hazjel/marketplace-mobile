@@ -41,6 +41,7 @@ import 'package:blukios_marketplace/features/seller/wallet/models/seller_wallet_
 import 'package:blukios_marketplace/features/seller/wallet/screens/seller_wallet_screen.dart';
 import 'package:blukios_marketplace/features/seller/wallet/screens/withdrawal_form_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
+import 'package:blukios_marketplace/features/store/screens/store_list_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
 import 'package:blukios_marketplace/shared/widgets/app_shell.dart';
@@ -71,6 +72,7 @@ class AppRoutes {
   static const String notificationSettings = '/account/notifications';
   static const String privacySettings = '/account/privacy';
   static const String deleteAccount = '/account/delete-account';
+  static const String stores = '/stores';
   static const String storeDetail = '/store/:username';
   static const String dashboard = '/account/dashboard';
   static const String chatList = '/chat';
@@ -288,6 +290,11 @@ class AppRoutes {
           path: dashboard,
           parentNavigatorKey: _rootNavigatorKey,
           builder: (_, __) => const DashboardScreen(),
+        ),
+        GoRoute(
+          path: stores,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const StoreListScreen(),
         ),
         GoRoute(
           path: storeDetail,
