@@ -105,6 +105,25 @@ void main() {
     expect(find.textContaining('catatan internal'), findsNothing);
   });
 
+  testWidgets('an order paid partly with saldo shows how much', (tester) async {
+    await pumpList(tester, [
+      TransactionModel(
+        id: 't4',
+        code: 'TRX-t4',
+        shippingCost: 0,
+        deliveryStatus: 'pending',
+        tax: 0,
+        grandTotal: 50000,
+        balanceUsed: 20000,
+        paymentStatus: 'paid',
+        transactionDetails: const [],
+      ),
+      _cancelled(refundStatus: 'refunded'),
+    ]);
+
+    expect(find.text('Dibayar dengan Saldo Blukios: Rp 20.000'), findsOneWidget);
+  });
+
   TransactionModel delivering({TransactionComplaint? complaint}) => TransactionModel(
         id: 't3',
         code: 'TRX-t3',

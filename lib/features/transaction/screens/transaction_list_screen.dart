@@ -279,6 +279,13 @@ class _TransactionCard extends StatelessWidget {
               ),
             ],
           ),
+          if (trx.balanceUsed > 0) ...[
+            const SizedBox(height: AppTheme.spacingXS),
+            Text(
+              'Dibayar dengan Saldo Blukios: ${CurrencyFormatter.formatRupiah(trx.balanceUsed)}',
+              style: AppTheme.labelSm.copyWith(color: muted),
+            ),
+          ],
           if (trx.refundStatus != null) ...[
             const SizedBox(height: AppTheme.spacingMD),
             _RefundInfo(trx: trx, onRefundAccount: onRefundAccount),

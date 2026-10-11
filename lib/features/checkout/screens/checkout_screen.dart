@@ -10,6 +10,7 @@ import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/viewmodels/cart_viewmodel.dart';
 import 'package:blukios_marketplace/features/checkout/viewmodels/checkout_viewmodel.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
+import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   final CartGroupModel group;
@@ -33,7 +34,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(checkoutProvider(widget.group).notifier).loadSavedAddresses();
+      final notifier = ref.read(checkoutProvider(widget.group).notifier);
+      notifier.loadSavedAddresses();
+      notifier.loadBalance();
     });
   }
 
@@ -94,15 +97,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // to avoid double-ordering, matching the web checkout's behavior.
     ref.read(cartProvider.notifier).removeGroup(viewModel.group.storeId);
 
-    if (transaction.snapToken == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pesanan dibuat, namun gagal memuat halaman pembayaran')),
-      );
-      context.go(AppRoutes.transactions);
-      return;
+    switch (checkoutOutcome(transaction)) {
+      case CheckoutOutcome.paidWithBalance:
+        // Already paid server-side: no Midtrans page, same landing as a
+        // finished webview payment.
+        ref.read(transactionProvider.notifier).loadTransactions();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pembayaran berhasil dengan Saldo Blukios!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+        context.go(AppRoutes.transactions);
+      case CheckoutOutcome.paymentPageMissing:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pesanan dibuat, namun gagal memuat halaman pembayaran')),
+        );
+        context.go(AppRoutes.transactions);
+      case CheckoutOutcome.openPayment:
+        context.push(AppRoutes.paymentPath(transaction.id), extra: transaction.snapToken);
     }
-
-    context.push(AppRoutes.paymentPath(transaction.id), extra: transaction.snapToken);
   }
 
   @override
@@ -230,6 +244,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   _buildSummaryRow('Biaya Layanan', viewModel.serviceFee),
                   const Divider(),
                   _buildSummaryRow('Total Tagihan', viewModel.grandTotal, isBold: true),
+                  if (viewModel.balance > 0) ...[
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(
+                        'Pakai Saldo Blukios (${CurrencyFormatter.formatRupiah(viewModel.balance)})',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      value: viewModel.useBalance,
+                      onChanged: viewModel.isSubmitting ? null : notifier.setUseBalance,
+                    ),
+                    if (viewModel.useBalance) ...[
+                      _buildSummaryRow('Saldo Blukios', viewModel.balanceToUse, isDiscount: true),
+                      _buildSummaryRow('Sisa Dibayar', viewModel.amountDue, isBold: true),
+                    ],
+                  ],
                 ],
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/config/routes.dart';
+import 'package:blukios_marketplace/features/balance/viewmodels/buyer_balance_viewmodel.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 
@@ -65,6 +66,8 @@ class _PaymentWebviewScreenState extends ConsumerState<PaymentWebviewScreen> {
     _finished = true;
 
     if (!mounted) return;
+    // A failed or abandoned payment may give Saldo Blukios back.
+    ref.read(buyerBalanceProvider.notifier).load();
     await ref.read(transactionProvider.notifier).refreshStatus(widget.transactionId);
 
     if (!mounted) return;

@@ -26,6 +26,12 @@ class TransactionModel {
   /// Part of [grandTotal] paid with Saldo Blukios; the rest went through
   /// Midtrans. On a cancelled order this part is already back in the saldo.
   final double balanceUsed;
+
+  /// Part of [grandTotal] charged through Midtrans (what snap_token pays).
+  final double midtransAmount;
+
+  /// Saldo Blukios covered the whole order: already paid, no snap_token.
+  final bool paidWithBalance;
   final String? voucherId;
   final String? voucherCode;
   final double discountAmount;
@@ -77,6 +83,8 @@ class TransactionModel {
     this.serviceFee = 0,
     required this.grandTotal,
     this.balanceUsed = 0,
+    double? midtransAmount,
+    this.paidWithBalance = false,
     this.voucherId,
     this.voucherCode,
     this.discountAmount = 0,
@@ -93,7 +101,7 @@ class TransactionModel {
     this.refundedAt,
     this.refundAccount,
     this.complaint,
-  });
+  }) : midtransAmount = midtransAmount ?? grandTotal - balanceUsed;
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     final store = json['store'];
@@ -118,6 +126,8 @@ class TransactionModel {
       serviceFee: (json.moneyIntOrNull('service_fee') ?? 0).toDouble(),
       grandTotal: json.moneyInt('grand_total').toDouble(),
       balanceUsed: (json.moneyIntOrNull('balance_used') ?? 0).toDouble(),
+      midtransAmount: json.moneyIntOrNull('midtrans_amount')?.toDouble(),
+      paidWithBalance: json['paid_with_balance'] == true,
       voucherId: json['voucher_id']?.toString(),
       voucherCode: json['voucher_code'],
       discountAmount: json.moneyInt('discount_amount').toDouble(),
@@ -172,6 +182,8 @@ class TransactionModel {
       serviceFee: serviceFee,
       grandTotal: grandTotal,
       balanceUsed: balanceUsed,
+      midtransAmount: midtransAmount,
+      paidWithBalance: paidWithBalance,
       voucherId: voucherId,
       voucherCode: voucherCode,
       discountAmount: discountAmount,

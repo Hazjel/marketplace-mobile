@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -5,6 +7,9 @@ import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
+import 'package:blukios_marketplace/core/network/api_response.dart';
+import 'package:blukios_marketplace/features/balance/data/buyer_balance_repository.dart';
+import 'package:blukios_marketplace/features/balance/models/buyer_balance_model.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/checkout/data/voucher_repository.dart';
 import 'package:blukios_marketplace/features/checkout/models/voucher_model.dart';
@@ -21,6 +26,16 @@ class MockShipmentRepository extends Mock implements ShipmentRepository {}
 class MockTransactionRepository extends Mock implements TransactionRepository {}
 
 class MockVoucherRepository extends Mock implements VoucherRepository {}
+
+class MockBuyerBalanceRepository extends Mock implements BuyerBalanceRepository {}
+
+BuyerBalancePage _balance(int amount) => BuyerBalancePage(
+      balance: amount,
+      histories: const PaginatedResponse(
+        items: [],
+        meta: PaginationMeta(currentPage: 1, lastPage: 1, perPage: 20, total: 0),
+      ),
+    );
 
 AddressModel _address({String id = 'addr-1', bool isPrimary = false, String cityId = 'city-1'}) {
   return AddressModel(
@@ -74,6 +89,7 @@ void main() {
   late MockShipmentRepository shipmentRepository;
   late MockTransactionRepository transactionRepository;
   late MockVoucherRepository voucherRepository;
+  late MockBuyerBalanceRepository balanceRepository;
   late ProviderContainer container;
   late CartGroupModel testGroup;
 
@@ -82,6 +98,8 @@ void main() {
     shipmentRepository = MockShipmentRepository();
     transactionRepository = MockTransactionRepository();
     voucherRepository = MockVoucherRepository();
+    balanceRepository = MockBuyerBalanceRepository();
+    when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(0));
     testGroup = _group();
     container = ProviderContainer(
       overrides: [
@@ -89,6 +107,7 @@ void main() {
         shipmentRepositoryProvider.overrideWithValue(shipmentRepository),
         transactionRepositoryProvider.overrideWithValue(transactionRepository),
         voucherRepositoryProvider.overrideWithValue(voucherRepository),
+        buyerBalanceRepositoryProvider.overrideWithValue(balanceRepository),
       ],
     );
   });
@@ -216,6 +235,7 @@ void main() {
       expect(result, isNull);
       expect(container.read(checkoutProvider(testGroup)).submitError, isNotNull);
       verifyNever(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -248,6 +268,7 @@ void main() {
       );
       final transaction = _transaction();
       when(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -292,6 +313,7 @@ void main() {
           shipmentRepositoryProvider.overrideWithValue(shipmentRepository),
           transactionRepositoryProvider.overrideWithValue(transactionRepository),
           voucherRepositoryProvider.overrideWithValue(voucherRepository),
+          buyerBalanceRepositoryProvider.overrideWithValue(balanceRepository),
         ],
       );
       addTearDown(container2.dispose);
@@ -303,6 +325,7 @@ void main() {
         CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne'),
       );
       when(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -320,6 +343,7 @@ void main() {
       await notifier.submit(buyerId: 'buyer-1');
 
       verify(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -357,6 +381,7 @@ void main() {
 
       final transaction = _transaction();
       when(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -375,6 +400,7 @@ void main() {
       await notifier.submit(buyerId: 'buyer-1');
 
       verify(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
             buyerId: any(named: 'buyerId'),
             storeId: any(named: 'storeId'),
             addressId: any(named: 'addressId'),
@@ -449,6 +475,278 @@ void main() {
       final state = container.read(checkoutProvider(testGroup));
       expect(state.appliedVoucher, isNull);
       expect(state.grandTotal, withDiscount + 2000);
+    });
+  });
+
+  group('Saldo Blukios', () {
+    final courier = CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne');
+
+    test('preview: saldo covers up to the total, the rest is due', () {
+      // grandTotal = 20000 + 5000 + 1000 = 26000
+      final partial = CheckoutData(group: _group(), selectedCourier: courier, balance: 10000, useBalance: true);
+      expect(partial.balanceToUse, 10000);
+      expect(partial.amountDue, 16000);
+
+      final full = CheckoutData(group: _group(), selectedCourier: courier, balance: 50000, useBalance: true);
+      expect(full.balanceToUse, 26000);
+      expect(full.amountDue, 0);
+
+      final off = CheckoutData(group: _group(), selectedCourier: courier, balance: 50000);
+      expect(off.balanceToUse, 0);
+      expect(off.amountDue, 26000);
+    });
+
+    void stubCreate(Future<TransactionModel> Function(Invocation) answer) {
+      when(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+            voucherCode: any(named: 'voucherCode'),
+            useBalance: any(named: 'useBalance'),
+          )).thenAnswer(answer);
+    }
+
+    Future<CheckoutNotifier> ready() async {
+      when(() => addressRepository.getAddresses()).thenAnswer((_) async => [_address()]);
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      await notifier.loadSavedAddresses();
+      notifier.selectCourier(courier);
+      stubCreate((_) async => _transaction());
+      return notifier;
+    }
+
+    void verifyUseBalance(bool expected) {
+      verify(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+            voucherCode: any(named: 'voucherCode'),
+            useBalance: expected,
+          )).called(1);
+    }
+
+    test('use_balance is sent when switched on with saldo', () async {
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(10000));
+      final notifier = await ready();
+      await notifier.loadBalance();
+      expect(container.read(checkoutProvider(testGroup)).balance, 10000);
+
+      notifier.setUseBalance(true);
+      await notifier.submit(buyerId: 'buyer-1');
+
+      verifyUseBalance(true);
+    });
+
+    test('use_balance is not sent when the switch is off', () async {
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(10000));
+      final notifier = await ready();
+      await notifier.loadBalance();
+
+      await notifier.submit(buyerId: 'buyer-1');
+
+      verifyUseBalance(false);
+    });
+
+    test('use_balance is not sent when the saldo is empty, even switched on', () async {
+      final notifier = await ready();
+      await notifier.loadBalance();
+
+      notifier.setUseBalance(true);
+      await notifier.submit(buyerId: 'buyer-1');
+
+      verifyUseBalance(false);
+    });
+
+    test('a failed checkout refreshes the saldo', () async {
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(10000));
+      final notifier = await ready();
+      await notifier.loadBalance();
+      notifier.setUseBalance(true);
+      stubCreate((_) async => throw ApiException(message: 'Saldo Blukios tidak cukup', statusCode: 422));
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(0));
+
+      final result = await notifier.submit(buyerId: 'buyer-1');
+      expect(result, isNull);
+      expect(container.read(checkoutProvider(testGroup)).submitError, 'Saldo Blukios tidak cukup');
+
+      await pumpEventQueue(); // the refresh doesn't hold up the error
+      final state = container.read(checkoutProvider(testGroup));
+      expect(state.balance, 0);
+      expect(state.balanceToUse, 0);
+    });
+
+    test('a saldo that cannot be loaded is not offered with a stale amount', () async {
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(10000));
+      final notifier = await ready();
+      await notifier.loadBalance();
+      when(() => balanceRepository.getBalance())
+          .thenThrow(ApiException(message: 'Terjadi kesalahan', statusCode: 500));
+
+      await notifier.loadBalance();
+
+      expect(container.read(checkoutProvider(testGroup)).balance, 0);
+    });
+  });
+
+  group('idempotency', () {
+    final courier = CourierOptionModel(shippingName: 'JNE', serviceName: 'REG', shippingCostNet: 5000, code: 'jne');
+
+    void stubCreate(Future<TransactionModel> Function(Invocation) answer) {
+      when(() => transactionRepository.createTransaction(
+            idempotencyKey: any(named: 'idempotencyKey'),
+            buyerId: any(named: 'buyerId'),
+            storeId: any(named: 'storeId'),
+            addressId: any(named: 'addressId'),
+            address: any(named: 'address'),
+            city: any(named: 'city'),
+            postalCode: any(named: 'postalCode'),
+            destLatitude: any(named: 'destLatitude'),
+            destLongitude: any(named: 'destLongitude'),
+            shipping: any(named: 'shipping'),
+            shippingType: any(named: 'shippingType'),
+            shippingCost: any(named: 'shippingCost'),
+            products: any(named: 'products'),
+            voucherCode: any(named: 'voucherCode'),
+            useBalance: any(named: 'useBalance'),
+          )).thenAnswer(answer);
+    }
+
+    List<String> sentKeys() => verify(() => transactionRepository.createTransaction(
+          idempotencyKey: captureAny(named: 'idempotencyKey'),
+          buyerId: any(named: 'buyerId'),
+          storeId: any(named: 'storeId'),
+          addressId: any(named: 'addressId'),
+          address: any(named: 'address'),
+          city: any(named: 'city'),
+          postalCode: any(named: 'postalCode'),
+          destLatitude: any(named: 'destLatitude'),
+          destLongitude: any(named: 'destLongitude'),
+          shipping: any(named: 'shipping'),
+          shippingType: any(named: 'shippingType'),
+          shippingCost: any(named: 'shippingCost'),
+          products: any(named: 'products'),
+          voucherCode: any(named: 'voucherCode'),
+          useBalance: any(named: 'useBalance'),
+        )).captured.cast<String>();
+
+    Future<CheckoutNotifier> ready() async {
+      when(() => addressRepository.getAddresses()).thenAnswer((_) async => [_address()]);
+      final notifier = container.read(checkoutProvider(testGroup).notifier);
+      await notifier.loadSavedAddresses();
+      notifier.selectCourier(courier);
+      return notifier;
+    }
+
+    final networkError = ApiException(message: 'Tidak ada koneksi internet');
+
+    test('a double submit sends one request', () async {
+      final notifier = await ready();
+      final response = Completer<TransactionModel>();
+      stubCreate((_) => response.future);
+
+      final first = notifier.submit(buyerId: 'buyer-1');
+      final second = await notifier.submit(buyerId: 'buyer-1');
+      response.complete(_transaction());
+
+      expect(second, isNull);
+      expect(await first, isNotNull);
+      expect(sentKeys(), hasLength(1));
+    });
+
+    test('a retry after a network error reuses the key and says the order may exist', () async {
+      final notifier = await ready();
+      stubCreate((_) async => throw networkError);
+      await notifier.submit(buyerId: 'buyer-1');
+      expect(
+        container.read(checkoutProvider(testGroup)).submitError,
+        'Periksa menu Transaksi — pesanan mungkin sudah dibuat',
+      );
+
+      stubCreate((_) async => _transaction());
+      await notifier.submit(buyerId: 'buyer-1');
+
+      final keys = sentKeys();
+      expect(keys, hasLength(2));
+      expect(keys[1], keys[0]);
+    });
+
+    test('toggling Saldo Blukios makes the next submit a new attempt', () async {
+      when(() => balanceRepository.getBalance()).thenAnswer((_) async => _balance(10000));
+      final notifier = await ready();
+      await notifier.loadBalance();
+      stubCreate((_) async => throw networkError);
+      await notifier.submit(buyerId: 'buyer-1');
+
+      notifier.setUseBalance(true);
+      await notifier.submit(buyerId: 'buyer-1');
+
+      final keys = sentKeys();
+      expect(keys[1], isNot(keys[0]));
+    });
+
+    test('after a successful order the next submit gets a new key', () async {
+      final notifier = await ready();
+      stubCreate((_) async => _transaction());
+      await notifier.submit(buyerId: 'buyer-1');
+      await notifier.submit(buyerId: 'buyer-1');
+
+      final keys = sentKeys();
+      expect(keys[1], isNot(keys[0]));
+    });
+  });
+
+  group('checkoutOutcome', () {
+    TransactionModel order({String? snapToken, bool paidWithBalance = false}) => TransactionModel(
+          id: 'trx-1',
+          code: 'TRX001',
+          shippingCost: 5000,
+          deliveryStatus: 'pending',
+          tax: 0,
+          grandTotal: 26000,
+          balanceUsed: paidWithBalance ? 26000 : 0,
+          paidWithBalance: paidWithBalance,
+          paymentStatus: paidWithBalance ? 'paid' : 'pending',
+          snapToken: snapToken,
+          transactionDetails: const [],
+        );
+
+    test('paid fully with saldo skips the payment page', () {
+      expect(checkoutOutcome(order(paidWithBalance: true)), CheckoutOutcome.paidWithBalance);
+    });
+
+    test('paid with saldo skips the payment page even if a snap token came along', () {
+      expect(
+        checkoutOutcome(order(paidWithBalance: true, snapToken: 'snap-1')),
+        CheckoutOutcome.paidWithBalance,
+      );
+    });
+
+    test('a snap token opens the payment page', () {
+      expect(checkoutOutcome(order(snapToken: 'snap-1')), CheckoutOutcome.openPayment);
+    });
+
+    test('no snap token and not paid with saldo is still an error', () {
+      expect(checkoutOutcome(order()), CheckoutOutcome.paymentPageMissing);
     });
   });
 }

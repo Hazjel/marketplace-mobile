@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/core/network/api_client.dart';
-import 'package:blukios_marketplace/core/utils/idempotency_key.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
 class TransactionRepository {
@@ -47,7 +46,10 @@ class TransactionRepository {
     return TransactionModel.fromJson(response.data['data']);
   }
 
+  /// [idempotencyKey] belongs to the checkout attempt, not to this call:
+  /// resending the same key gets the first order back instead of a second.
   Future<TransactionModel> createTransaction({
+    required String idempotencyKey,
     required String buyerId,
     required String storeId,
     required String addressId,
@@ -61,6 +63,7 @@ class TransactionRepository {
     required double shippingCost,
     required List<Map<String, dynamic>> products,
     String? voucherCode,
+    bool useBalance = false,
   }) async {
     final response = await _apiClient.post(
       ApiConfig.transactions,
@@ -78,8 +81,10 @@ class TransactionRepository {
         'shipping_cost': shippingCost,
         'products': products,
         if (voucherCode != null) 'voucher_code': voucherCode,
+        // Saldo Blukios pays first; the server decides how much.
+        if (useBalance) 'use_balance': true,
       },
-      headers: {'X-Idempotency-Key': IdempotencyKey.generate()},
+      headers: {'X-Idempotency-Key': idempotencyKey},
     );
     return TransactionModel.fromJson(response.data['data']);
   }

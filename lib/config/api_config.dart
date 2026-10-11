@@ -139,6 +139,10 @@ class ApiConfig {
   // Voucher / redeem code
   static const String voucherValidate = '/voucher/validate';
 
+  // Saldo Blukios — the caller's own buyer balance + history (403 when the
+  // account has no buyer profile).
+  static const String buyerBalance = '/balance';
+
   // Seller voucher management
   static const String sellerVouchers = '/my-store/vouchers';
   static String sellerVoucherById(String id) => '/my-store/vouchers/$id';

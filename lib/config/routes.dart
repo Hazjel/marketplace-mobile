@@ -13,6 +13,7 @@ import 'package:blukios_marketplace/features/auth/screens/login_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/register_screen.dart';
 import 'package:blukios_marketplace/features/auth/screens/splash_screen.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/features/balance/screens/buyer_balance_screen.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/cart/screens/cart_screen.dart';
 import 'package:blukios_marketplace/features/category/screens/category_browse_screen.dart';
@@ -75,6 +76,7 @@ class AppRoutes {
   static const String stores = '/stores';
   static const String storeDetail = '/store/:username';
   static const String dashboard = '/account/dashboard';
+  static const String buyerBalance = '/account/balance';
   static const String chatList = '/chat';
   static const String chatThread = '/chat/:partnerId';
 
@@ -290,6 +292,11 @@ class AppRoutes {
           path: dashboard,
           parentNavigatorKey: _rootNavigatorKey,
           builder: (_, __) => const DashboardScreen(),
+        ),
+        GoRoute(
+          path: buyerBalance,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const BuyerBalanceScreen(),
         ),
         GoRoute(
           path: stores,

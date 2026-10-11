@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/core/utils/idempotency_key.dart';
 import 'package:blukios_marketplace/features/address/models/address_model.dart';
+import 'package:blukios_marketplace/features/balance/viewmodels/buyer_balance_viewmodel.dart';
 import 'package:blukios_marketplace/features/cart/models/cart_model.dart';
 import 'package:blukios_marketplace/features/checkout/models/voucher_model.dart';
 import 'package:blukios_marketplace/features/shipment/models/courier_option_model.dart';
@@ -23,6 +28,10 @@ class CheckoutData {
   final bool isValidatingVoucher;
   final String? voucherError;
 
+  /// Saldo Blukios available (0 until loaded or when it can't be).
+  final int balance;
+  final bool useBalance;
+
   const CheckoutData({
     required this.group,
     this.savedAddresses = const [],
@@ -37,6 +46,8 @@ class CheckoutData {
     this.appliedVoucher,
     this.isValidatingVoucher = false,
     this.voucherError,
+    this.balance = 0,
+    this.useBalance = false,
   });
 
   /// Flat platform fee per order, mirroring the API's
@@ -53,6 +64,13 @@ class CheckoutData {
   /// before the service fee is added, so a voucher never reduces the fee.
   double get grandTotal =>
       (subtotal + shippingCost - discountAmount).clamp(0, double.infinity) + serviceFee;
+
+  /// What Saldo Blukios would cover. A preview: the server recomputes it.
+  double get balanceToUse =>
+      useBalance && balance > 0 ? min(balance.toDouble(), grandTotal) : 0;
+
+  /// "Sisa Dibayar": what's left for Midtrans.
+  double get amountDue => grandTotal - balanceToUse;
 
   CheckoutData copyWith({
     List<AddressModel>? savedAddresses,
@@ -72,6 +90,8 @@ class CheckoutData {
     bool? isValidatingVoucher,
     String? voucherError,
     bool clearVoucherError = false,
+    int? balance,
+    bool? useBalance,
   }) {
     return CheckoutData(
       group: group,
@@ -92,6 +112,8 @@ class CheckoutData {
       isValidatingVoucher: isValidatingVoucher ?? this.isValidatingVoucher,
       voucherError:
           clearVoucherError ? null : (voucherError ?? this.voucherError),
+      balance: balance ?? this.balance,
+      useBalance: useBalance ?? this.useBalance,
     );
   }
 }
@@ -101,6 +123,10 @@ class CheckoutData {
 class CheckoutNotifier
     extends AutoDisposeFamilyNotifier<CheckoutData, CartGroupModel> {
   bool _disposed = false;
+
+  /// X-Idempotency-Key of the current checkout attempt and what it ordered.
+  String? _idempotencyKey;
+  String? _attempt;
 
   @override
   CheckoutData build(CartGroupModel group) {
@@ -136,6 +162,15 @@ class CheckoutNotifier
       );
     }
   }
+
+  /// Refreshes the shared Saldo Blukios and mirrors it here.
+  Future<void> loadBalance() async {
+    await ref.read(buyerBalanceProvider.notifier).load();
+    if (_disposed) return;
+    state = state.copyWith(balance: ref.read(buyerBalanceProvider).balance ?? 0);
+  }
+
+  void setUseBalance(bool value) => state = state.copyWith(useBalance: value);
 
   void selectAddress(AddressModel address) {
     state = state.copyWith(
@@ -250,12 +285,35 @@ class CheckoutNotifier
       state = state.copyWith(submitError: 'Pilih kurir terlebih dahulu');
       return null;
     }
+    // A second tap while the first request runs must not order twice.
+    if (state.isSubmitting) return null;
+
+    final useBalance = state.useBalance && state.balance > 0;
+    // Same order = same key, so a retry after a lost response is answered
+    // with the first result (API IdempotencyMiddleware) instead of ordering
+    // again. Any change to what is ordered makes it a new attempt.
+    final attempt = [
+      buyerId,
+      address.id,
+      courier.shippingName,
+      courier.serviceName,
+      courier.shippingCostNet,
+      state.appliedVoucher?.code,
+      useBalance,
+      for (final item in state.group.items)
+        '${item.productId}/${item.variantId}/${item.quantity}',
+    ].join('|');
+    if (attempt != _attempt) {
+      _attempt = attempt;
+      _idempotencyKey = IdempotencyKey.generate();
+    }
 
     state = state.copyWith(isSubmitting: true, clearSubmitError: true);
 
     try {
       final transaction =
           await ref.read(transactionRepositoryProvider).createTransaction(
+                idempotencyKey: _idempotencyKey!,
                 buyerId: buyerId,
                 storeId: state.group.storeId,
                 addressId: address.cityId,
@@ -275,7 +333,13 @@ class CheckoutNotifier
                         })
                     .toList(),
                 voucherCode: state.appliedVoucher?.code,
+                useBalance: useBalance,
               );
+      // Done: the next submit is a new order.
+      _attempt = null;
+      _idempotencyKey = null;
+      // The saldo may have moved; refresh it for the rest of the app.
+      unawaited(ref.read(buyerBalanceProvider.notifier).load());
       if (_disposed) return null;
       state = state.copyWith(isSubmitting: false);
       AnalyticsService.logEvent('checkout_submitted', parameters: {
@@ -286,7 +350,17 @@ class CheckoutNotifier
       return transaction;
     } catch (e) {
       if (_disposed) return null;
-      state = state.copyWith(isSubmitting: false, submitError: e.toString());
+      // No server answer (timeout, connection) or an unreadable one: the
+      // order may exist. A retry is safe, the key is kept.
+      final serverMessage =
+          e is ApiException && e.statusCode != null ? e.message : null;
+      state = state.copyWith(
+        isSubmitting: false,
+        submitError: serverMessage ??
+            'Periksa menu Transaksi — pesanan mungkin sudah dibuat',
+      );
+      // E.g. 422: another checkout spent the saldo first. Show what's left.
+      unawaited(loadBalance());
       return null;
     }
   }
@@ -296,3 +370,12 @@ final checkoutProvider = AutoDisposeNotifierProviderFamily<CheckoutNotifier,
     CheckoutData, CartGroupModel>(
   CheckoutNotifier.new,
 );
+
+/// What the checkout screen does with a created order.
+enum CheckoutOutcome { paidWithBalance, openPayment, paymentPageMissing }
+
+CheckoutOutcome checkoutOutcome(TransactionModel transaction) {
+  if (transaction.paidWithBalance) return CheckoutOutcome.paidWithBalance;
+  if (transaction.snapToken == null) return CheckoutOutcome.paymentPageMissing;
+  return CheckoutOutcome.openPayment;
+}

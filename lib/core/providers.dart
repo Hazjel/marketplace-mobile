@@ -3,6 +3,7 @@ import 'package:blukios_marketplace/core/monitoring/device_token_repository.dart
 import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/features/address/data/address_repository.dart';
 import 'package:blukios_marketplace/features/auth/data/auth_repository.dart';
+import 'package:blukios_marketplace/features/balance/data/buyer_balance_repository.dart';
 import 'package:blukios_marketplace/features/cart/data/cart_repository.dart';
 import 'package:blukios_marketplace/features/checkout/data/voucher_repository.dart';
 import 'package:blukios_marketplace/features/home/data/product_repository.dart';
@@ -77,4 +78,8 @@ final sellerWalletRepositoryProvider = Provider<SellerWalletRepository>(
 
 final sellerVoucherRepositoryProvider = Provider<SellerVoucherRepository>(
   (ref) => SellerVoucherRepository(ref.watch(apiClientProvider)),
+);
+
+final buyerBalanceRepositoryProvider = Provider<BuyerBalanceRepository>(
+  (ref) => BuyerBalanceRepository(ref.watch(apiClientProvider)),
 );

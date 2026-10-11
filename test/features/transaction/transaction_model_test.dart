@@ -81,6 +81,20 @@ void main() {
       expect(() => TransactionModel.fromJson(json), throwsA(isA<FormatException>()));
     });
 
+    test('parses midtrans_amount and paid_with_balance', () {
+      final paid = TransactionModel.fromJson(_fixture()
+        ..['balance_used'] = 121006
+        ..['midtrans_amount'] = 0
+        ..['paid_with_balance'] = true);
+      expect(paid.midtransAmount, 0.0);
+      expect(paid.paidWithBalance, isTrue);
+
+      // Older payloads without the fields: Midtrans paid the rest.
+      final legacy = TransactionModel.fromJson(_fixture()..['balance_used'] = 1006);
+      expect(legacy.midtransAmount, 120000.0);
+      expect(legacy.paidWithBalance, isFalse);
+    });
+
     test('parses balance_used, defaulting to 0 when absent', () {
       expect(TransactionModel.fromJson(_fixture()..['balance_used'] = 20000).balanceUsed, 20000.0);
       expect(TransactionModel.fromJson(_fixture()).balanceUsed, 0.0);

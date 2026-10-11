@@ -6,6 +6,8 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/features/account/viewmodels/account_viewmodel.dart';
 import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
+import 'package:blukios_marketplace/features/balance/viewmodels/buyer_balance_viewmodel.dart';
+import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/config/api_config.dart';
@@ -30,6 +32,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(accountProvider.notifier).loadProfile();
+      ref.read(buyerBalanceProvider.notifier).load();
     });
   }
 
@@ -64,6 +67,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final muted =
         isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
     final isSeller = ref.watch(authProvider).currentUser?.role == 'store';
+    final saldo = ref.watch(buyerBalanceProvider);
 
     return AppScaffold(
       title: 'Akun',
@@ -127,6 +131,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           _MenuSection(
             title: 'Belanja',
             children: [
+              // Hidden for an account without a buyer profile (API 403).
+              if (!saldo.notBuyer)
+                _MenuTile(
+                  icon: AppIcons.wallet,
+                  label: 'Saldo Blukios',
+                  value: saldo.balance == null
+                      ? null
+                      : CurrencyFormatter.formatRupiah(saldo.balance),
+                  onTap: () => context.push(AppRoutes.buyerBalance),
+                ),
               _MenuTile(
                 icon: AppIcons.transaction,
                 label: 'Transaksi Saya',
@@ -449,11 +463,13 @@ class _MenuSection extends StatelessWidget {
 class _MenuTile extends StatelessWidget {
   final String icon;
   final String label;
+  final String? value;
   final VoidCallback onTap;
 
   const _MenuTile({
     required this.icon,
     required this.label,
+    this.value,
     required this.onTap,
   });
 
@@ -476,6 +492,8 @@ class _MenuTile extends StatelessWidget {
             AppIcon(icon, size: AppIconSize.md, color: muted),
             const SizedBox(width: AppTheme.spacingMD),
             Expanded(child: Text(label, style: AppTheme.titleMd)),
+            if (value != null)
+              Text(value!, style: AppTheme.bodyMd.copyWith(color: muted)),
             AppIcon(AppIcons.chevronRight, size: AppIconSize.md, color: muted),
           ],
         ),
