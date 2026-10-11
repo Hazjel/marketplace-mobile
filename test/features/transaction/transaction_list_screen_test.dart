@@ -80,4 +80,54 @@ void main() {
     expect(find.text('Isi Rekening Refund'), findsNothing);
     expect(find.text('Ubah Rekening'), findsNothing);
   });
+
+  testWidgets('a saldo refund says so, not the e-wallet wait', (tester) async {
+    final trx = TransactionModel(
+      id: 't2',
+      code: 'TRX-t2',
+      shippingCost: 0,
+      deliveryStatus: 'cancelled',
+      tax: 0,
+      grandTotal: 50000,
+      paymentStatus: 'failed',
+      transactionDetails: const [],
+      refundStatus: 'refunded',
+      refundMethod: 'balance',
+      refundAmount: 30000,
+      balanceUsed: 20000,
+      refundNote: 'catatan internal admin',
+    );
+    await pumpList(tester, [trx]);
+
+    expect(find.text('Rp 50.000 sudah masuk ke Saldo Blukios dan bisa dipakai untuk belanja.'),
+        findsOneWidget);
+    expect(find.textContaining('e-wallet'), findsNothing);
+    expect(find.textContaining('catatan internal'), findsNothing);
+  });
+
+  TransactionModel delivering({TransactionComplaint? complaint}) => TransactionModel(
+        id: 't3',
+        code: 'TRX-t3',
+        shippingCost: 0,
+        deliveryStatus: 'delivering',
+        tax: 0,
+        grandTotal: 50000,
+        paymentStatus: 'paid',
+        transactionDetails: const [],
+        complaint: complaint,
+      );
+
+  testWidgets('an active complaint hides "Konfirmasi Pesanan Diterima"', (tester) async {
+    await pumpList(tester, [delivering(complaint: const TransactionComplaint(id: 'c1', status: 'open'))]);
+
+    expect(find.text('Konfirmasi Pesanan Diterima'), findsNothing);
+    expect(find.text('Komplain sedang diproses — pesanan belum bisa diselesaikan'), findsOneWidget);
+  });
+
+  testWidgets('without an active complaint the order can be confirmed', (tester) async {
+    await pumpList(tester, [delivering(complaint: const TransactionComplaint(id: 'c1', status: 'rejected'))]);
+
+    expect(find.text('Konfirmasi Pesanan Diterima'), findsOneWidget);
+    expect(find.textContaining('Komplain sedang diproses'), findsNothing);
+  });
 }

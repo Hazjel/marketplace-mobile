@@ -47,6 +47,19 @@ class NotificationService {
       StreamController<Map<String, dynamic>>.broadcast();
   static Stream<Map<String, dynamic>> get onNotificationTap => _tapController.stream;
 
+  static Map<String, dynamic>? _initialTap;
+
+  /// The push that launched the app from a terminated state, once; null
+  /// afterwards or when the app was opened normally.
+  static Map<String, dynamic>? takeInitialTap() {
+    final tap = _initialTap;
+    _initialTap = null;
+    return tap;
+  }
+
+  @visibleForTesting
+  static set initialTapForTest(Map<String, dynamic>? tap) => _initialTap = tap;
+
   static bool get isInitialized => _initialized;
 
   /// Call once from main.dart, after `Firebase.initializeApp()` succeeds.
@@ -97,11 +110,11 @@ class NotificationService {
         _tapController.add(message.data);
       });
 
-      // Cold-start case: app was fully closed, user tapped the push to open it.
+      // Cold-start case: app was fully closed, user tapped the push to open
+      // it. Kept for [takeInitialTap] rather than broadcast — this runs
+      // before runApp, when nothing listens yet, so the event would be lost.
       final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-      if (initialMessage != null) {
-        _tapController.add(initialMessage.data);
-      }
+      _initialTap = initialMessage?.data;
 
       _initialized = true;
     } catch (e, st) {

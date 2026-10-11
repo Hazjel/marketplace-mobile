@@ -1,3 +1,4 @@
+import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/json.dart';
 
 class TransactionModel {
@@ -21,6 +22,10 @@ class TransactionModel {
   final double tax;
   final double serviceFee;
   final double grandTotal;
+
+  /// Part of [grandTotal] paid with Saldo Blukios; the rest went through
+  /// Midtrans. On a cancelled order this part is already back in the saldo.
+  final double balanceUsed;
   final String? voucherId;
   final String? voucherCode;
   final double discountAmount;
@@ -41,6 +46,10 @@ class TransactionModel {
   /// Bank account for a manual refund; the API only sends it to the buyer
   /// who owns the order and to admins.
   final RefundAccount? refundAccount;
+
+  /// The buyer's complaint on this order, null when there is none (or the
+  /// viewer may not see it).
+  final TransactionComplaint? complaint;
 
   /// Product ids already reviewed within this transaction — from the
   /// `product_reviews` relation, present when the API loads it (e.g. on
@@ -67,6 +76,7 @@ class TransactionModel {
     required this.tax,
     this.serviceFee = 0,
     required this.grandTotal,
+    this.balanceUsed = 0,
     this.voucherId,
     this.voucherCode,
     this.discountAmount = 0,
@@ -82,6 +92,7 @@ class TransactionModel {
     this.refundNote,
     this.refundedAt,
     this.refundAccount,
+    this.complaint,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -106,6 +117,7 @@ class TransactionModel {
       tax: json.moneyInt('tax').toDouble(),
       serviceFee: (json.moneyIntOrNull('service_fee') ?? 0).toDouble(),
       grandTotal: json.moneyInt('grand_total').toDouble(),
+      balanceUsed: (json.moneyIntOrNull('balance_used') ?? 0).toDouble(),
       voucherId: json['voucher_id']?.toString(),
       voucherCode: json['voucher_code'],
       discountAmount: json.moneyInt('discount_amount').toDouble(),
@@ -132,6 +144,9 @@ class TransactionModel {
       refundAccount: json['refund_account'] is Map<String, dynamic>
           ? RefundAccount.fromJson(json['refund_account'] as Map<String, dynamic>)
           : null,
+      complaint: json['complaint'] is Map<String, dynamic>
+          ? TransactionComplaint.fromJson(json['complaint'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -156,6 +171,7 @@ class TransactionModel {
       tax: tax,
       serviceFee: serviceFee,
       grandTotal: grandTotal,
+      balanceUsed: balanceUsed,
       voucherId: voucherId,
       voucherCode: voucherCode,
       discountAmount: discountAmount,
@@ -171,6 +187,7 @@ class TransactionModel {
       refundNote: refundNote,
       refundedAt: refundedAt,
       refundAccount: refundAccount,
+      complaint: complaint,
     );
   }
 
@@ -203,6 +220,39 @@ class TransactionModel {
 
   /// Waiting for the platform to transfer by hand (bank VA payments).
   bool get awaitsManualRefund => refundStatus == 'manual_required';
+
+  /// An open or escalated complaint blocks completing the order (the API
+  /// answers 422 until it is withdrawn or resolved).
+  bool get hasActiveComplaint => complaint?.isActive ?? false;
+
+  /// What the buyer is told about their money. Mirrors the API's
+  /// `App\Support\RefundMessage` word for word, so push, email and app
+  /// agree. [refundAmount] is the Midtrans part only; [balanceUsed] went
+  /// back to Saldo Blukios when the order was cancelled.
+  String? get refundMessage {
+    if (refundStatus == null) return null;
+    final refund = refundAmount ?? 0;
+    final x = CurrencyFormatter.formatRupiah(refund);
+    final balanceNote = balanceUsed == 0
+        ? ''
+        : ' ${CurrencyFormatter.formatRupiah(balanceUsed)} sudah kembali ke Saldo Blukios.';
+
+    if (refundStatus == 'refunded' && refundMethod == 'balance') {
+      return '${CurrencyFormatter.formatRupiah(refund + balanceUsed)} sudah masuk ke Saldo Blukios dan bisa dipakai untuk belanja.';
+    }
+    if (refund == 0) {
+      // Nothing owed through Midtrans (paid fully with Saldo Blukios).
+      return balanceUsed == 0 ? null : 'Pesananmu dibatalkan.$balanceNote';
+    }
+    return switch (refundStatus) {
+      'processing' => 'Pesananmu dibatalkan. Pengembalian $x ke metode pembayaranmu sedang diproses.$balanceNote',
+      'manual_required' => 'Pengembalian dana $x sedang kami periksa dan akan segera diselesaikan.$balanceNote',
+      'refunded' => refundMethod == 'manual'
+          ? '$x sudah ditransfer ke rekening yang kamu isi.$balanceNote'
+          : '$x sudah dikembalikan ke metode pembayaranmu. Waktu dana masuk mengikuti bank atau penyedia e-wallet.$balanceNote',
+      _ => null,
+    };
+  }
 
   String? get refundStatusLabel {
     switch (refundStatus) {
@@ -283,6 +333,26 @@ class RefundAccount {
       bankName: json.asStringOrNull('bank_name') ?? '',
       accountNumber: json.asStringOrNull('account_number') ?? '',
       accountName: json.asStringOrNull('account_name') ?? '',
+    );
+  }
+}
+
+/// Minimal view of `TransactionResource.complaint`; the full complaint
+/// screens parse the rest.
+class TransactionComplaint {
+  final String id;
+
+  /// `open` | `escalated` | resolved states.
+  final String status;
+
+  const TransactionComplaint({required this.id, required this.status});
+
+  bool get isActive => status == 'open' || status == 'escalated';
+
+  factory TransactionComplaint.fromJson(Map<String, dynamic> json) {
+    return TransactionComplaint(
+      id: json.asString('id'),
+      status: json.asString('status'),
     );
   }
 }

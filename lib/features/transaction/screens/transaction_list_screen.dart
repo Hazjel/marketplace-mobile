@@ -294,7 +294,13 @@ class _TransactionCard extends StatelessWidget {
               ),
             ),
           ],
-          if (trx.deliveryStatus == 'delivering') ...[
+          if (trx.deliveryStatus == 'delivering' && trx.hasActiveComplaint) ...[
+            const SizedBox(height: AppTheme.spacingMD),
+            Text(
+              'Komplain sedang diproses — pesanan belum bisa diselesaikan',
+              style: AppTheme.bodySm.copyWith(color: muted),
+            ),
+          ] else if (trx.deliveryStatus == 'delivering') ...[
             const SizedBox(height: AppTheme.spacingMD),
             SizedBox(
               width: double.infinity,
@@ -328,36 +334,22 @@ class _TransactionCard extends StatelessWidget {
   }
 }
 
-/// Refund for an order the seller rejected after payment. A bank VA payment
-/// cannot be refunded automatically, so the buyer gives an account here.
+/// Refund for an order cancelled after payment. Wording comes from
+/// [TransactionModel.refundMessage]; refund_note is admin-internal and never
+/// shown. Older bank VA refunds may still ask the buyer for an account.
 class _RefundInfo extends StatelessWidget {
   final TransactionModel trx;
   final VoidCallback onRefundAccount;
 
   const _RefundInfo({required this.trx, required this.onRefundAccount});
 
-  String get _description {
-    switch (trx.refundStatus) {
-      case 'processing':
-        return 'Dana sedang dikembalikan ke metode pembayaranmu.';
-      case 'manual_required':
-        return trx.refundAccount == null
-            ? 'Metode pembayaran ini tidak bisa direfund otomatis. Isi rekening tujuan, dana akan ditransfer oleh tim Blukios.'
-            : 'Dana akan ditransfer oleh tim Blukios ke rekening di bawah.';
-      case 'refunded':
-        return trx.refundMethod == 'manual'
-            ? 'Dana sudah ditransfer ke rekeningmu.'
-            : 'Dana sudah dikembalikan. QRIS dan e-wallet bisa butuh beberapa hari sampai masuk.';
-      default:
-        return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
     final account = trx.refundAccount;
+    final message = trx.refundMessage;
+    final total = (trx.refundAmount ?? 0) + trx.balanceUsed;
 
     return Container(
       width: double.infinity,
@@ -373,15 +365,24 @@ class _RefundInfo extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Pengembalian Dana', style: AppTheme.labelMd),
-              if (trx.refundAmount case final amount?)
+              if (total > 0)
                 Text(
-                  CurrencyFormatter.formatRupiah(amount),
+                  CurrencyFormatter.formatRupiah(total),
                   style: AppTheme.labelMd,
                 ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(_description, style: AppTheme.bodySm.copyWith(color: muted)),
+          if (message != null) ...[
+            const SizedBox(height: 4),
+            Text(message, style: AppTheme.bodySm.copyWith(color: muted)),
+          ],
+          if (trx.awaitsManualRefund && account == null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Isi rekening tujuan, dana akan ditransfer oleh tim Blukios.',
+              style: AppTheme.bodySm.copyWith(color: muted),
+            ),
+          ],
           if (trx.refundReason != null) ...[
             const SizedBox(height: 4),
             Text(
