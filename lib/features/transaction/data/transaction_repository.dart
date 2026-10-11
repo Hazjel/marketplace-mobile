@@ -181,4 +181,46 @@ class TransactionRepository {
     );
     return TransactionModel.fromJson(response.data['data']);
   }
+
+  /// Buyer files a complaint on a paid, delivering order — `POST
+  /// /transaction/{id}/complaint`, multipart: `reason`, `description` and up
+  /// to 3 `photos[]` (jpg/png/webp, 2 MB each). One per order.
+  Future<TransactionModel> createComplaint({
+    required String id,
+    required String reason,
+    required String description,
+    List<String> photoPaths = const [],
+  }) async {
+    final data = FormData()
+      ..fields.addAll([MapEntry('reason', reason), MapEntry('description', description)])
+      ..files.addAll([
+        for (final path in photoPaths) MapEntry('photos[]', await MultipartFile.fromFile(path)),
+      ]);
+    final response = await _apiClient.post(ApiConfig.transactionComplaint(id), data: data);
+    return TransactionModel.fromJson(response.data['data']);
+  }
+
+  /// Buyer withdraws an open or escalated complaint ([complaintId], not the
+  /// order's id).
+  Future<TransactionModel> withdrawComplaint(String complaintId) async {
+    final response = await _apiClient.post(ApiConfig.complaintWithdraw(complaintId));
+    return TransactionModel.fromJson(response.data['data']);
+  }
+
+  /// Seller accepts an open complaint: the buyer gets a full refund, stock
+  /// is not returned.
+  Future<TransactionModel> acceptComplaint(String complaintId) async {
+    final response = await _apiClient.post(ApiConfig.complaintAccept(complaintId));
+    return TransactionModel.fromJson(response.data['data']);
+  }
+
+  /// Seller rejects an open complaint; it goes to an admin. [response] is
+  /// shown to the buyer, 5–1000 characters.
+  Future<TransactionModel> rejectComplaint(String complaintId, String response) async {
+    final result = await _apiClient.post(
+      ApiConfig.complaintReject(complaintId),
+      data: {'response': response},
+    );
+    return TransactionModel.fromJson(result.data['data']);
+  }
 }

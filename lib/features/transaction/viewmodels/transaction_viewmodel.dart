@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/chat/viewmodels/chat_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
 class TransactionData {
@@ -163,6 +165,59 @@ class TransactionNotifier extends Notifier<TransactionData> {
     } catch (e) {
       return e.toString();
     }
+  }
+
+  /// Files a complaint on a paid, delivering order. Returns an error
+  /// message, or null on success.
+  Future<String?> createComplaint(
+    String id, {
+    required String reason,
+    required String description,
+    List<String> photoPaths = const [],
+  }) {
+    return _complaintAction(
+      id,
+      (repo) => repo.createComplaint(
+        id: id,
+        reason: reason,
+        description: description,
+        photoPaths: photoPaths,
+      ),
+    );
+  }
+
+  /// Withdraws the complaint on order [id]. Returns an error message, or
+  /// null on success.
+  Future<String?> withdrawComplaint(String id, String complaintId) {
+    return _complaintAction(id, (repo) => repo.withdrawComplaint(complaintId));
+  }
+
+  /// Puts the server's copy of the order in the list. On failure the order
+  /// is re-read, so a retry after a lost response shows what really
+  /// happened (complaint already filed or withdrawn) instead of a stale card.
+  Future<String?> _complaintAction(
+    String id,
+    Future<TransactionModel> Function(TransactionRepository repo) action,
+  ) async {
+    final repo = ref.read(transactionRepositoryProvider);
+    try {
+      _replace(await action(repo));
+      return null;
+    } catch (e) {
+      try {
+        _replace(await repo.getTransactionDetail(id));
+      } catch (_) {
+        // Best effort: the action's own error is what the user needs.
+      }
+      return e is ValidationException ? e.firstError : e.toString();
+    }
+  }
+
+  void _replace(TransactionModel updated) {
+    state = state.copyWith(
+      transactions: state.transactions.map((t) => t.id == updated.id ? updated : t).toList(),
+    );
+    _syncRealtimeSubscriptions();
   }
 }
 

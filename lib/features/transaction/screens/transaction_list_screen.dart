@@ -8,6 +8,7 @@ import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/widgets/complaint_details.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -148,6 +149,12 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                           onCompleteOrder: () => _completeOrder(viewModel.transactions[index]),
                           onRefundAccount: () =>
                               _submitRefundAccount(viewModel.transactions[index]),
+                          onComplain: () => context.push(
+                            AppRoutes.complaintFormPath(viewModel.transactions[index].id),
+                          ),
+                          onViewComplaint: () => context.push(
+                            AppRoutes.complaintPath(viewModel.transactions[index].id),
+                          ),
                         ),
                       ),
                     ),
@@ -161,6 +168,8 @@ class _TransactionCard extends StatelessWidget {
   final Future<void> Function(TransactionDetailModel) onReview;
   final VoidCallback onCompleteOrder;
   final VoidCallback onRefundAccount;
+  final VoidCallback onComplain;
+  final VoidCallback onViewComplaint;
 
   const _TransactionCard({
     required this.trx,
@@ -168,6 +177,8 @@ class _TransactionCard extends StatelessWidget {
     required this.onReview,
     required this.onCompleteOrder,
     required this.onRefundAccount,
+    required this.onComplain,
+    required this.onViewComplaint,
   });
 
   @override
@@ -315,6 +326,26 @@ class _TransactionCard extends StatelessWidget {
                 onPressed: onCompleteOrder,
                 icon: const AppIcon(AppIcons.check, size: AppIconSize.sm, color: Colors.white),
                 label: const Text('Konfirmasi Pesanan Diterima'),
+              ),
+            ),
+          ],
+          // One complaint per order, filed while it is paid and on its way.
+          if (trx.complaint case final complaint?) ...[
+            const SizedBox(height: AppTheme.spacingSM),
+            Row(
+              children: [
+                Flexible(child: ComplaintStatusBadge(complaint: complaint)),
+                const Spacer(),
+                TextButton(onPressed: onViewComplaint, child: const Text('Lihat Komplain')),
+              ],
+            ),
+          ] else if (trx.paymentStatus == 'paid' && trx.deliveryStatus == 'delivering') ...[
+            const SizedBox(height: AppTheme.spacingSM),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onComplain,
+                child: const Text('Ajukan Komplain'),
               ),
             ),
           ],

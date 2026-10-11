@@ -349,22 +349,76 @@ class RefundAccount {
   }
 }
 
-/// Minimal view of `TransactionResource.complaint`; the full complaint
-/// screens parse the rest.
+/// `TransactionResource.complaint`: the buyer's complaint on a delivering
+/// order. Labels match the web (fe-blue useTransactionStatus.js).
 class TransactionComplaint {
+  static const reasons = {
+    'not_received': 'Barang tidak sampai',
+    'damaged': 'Barang rusak',
+    'wrong_item': 'Barang salah',
+    'other': 'Lainnya',
+  };
+
+  static const statuses = {
+    'open': 'Menunggu tanggapan penjual',
+    'escalated': 'Ditinjau admin',
+    'approved': 'Disetujui – dana dikembalikan',
+    'rejected': 'Ditolak',
+    'withdrawn': 'Ditarik',
+  };
+
   final String id;
 
-  /// `open` | `escalated` | resolved states.
+  /// `open` | `escalated` | `approved` | `rejected` | `withdrawn`.
   final String status;
+  final String reason;
+  final String description;
 
-  const TransactionComplaint({required this.id, required this.status});
+  /// Full photo URLs.
+  final List<String> photos;
+  final String? sellerResponse;
+  final String? adminNote;
+
+  /// Seller must answer an `open` complaint by then, or it escalates.
+  final String? deadlineAt;
+  final String? escalatedAt;
+  final String? resolvedAt;
+  final String? createdAt;
+
+  const TransactionComplaint({
+    required this.id,
+    required this.status,
+    this.reason = '',
+    this.description = '',
+    this.photos = const [],
+    this.sellerResponse,
+    this.adminNote,
+    this.deadlineAt,
+    this.escalatedAt,
+    this.resolvedAt,
+    this.createdAt,
+  });
 
   bool get isActive => status == 'open' || status == 'escalated';
+
+  String get statusLabel => statuses[status] ?? status;
+  String get reasonLabel => reasons[reason] ?? reason;
 
   factory TransactionComplaint.fromJson(Map<String, dynamic> json) {
     return TransactionComplaint(
       id: json.asString('id'),
       status: json.asString('status'),
+      reason: json.asString('reason'),
+      description: json.asString('description'),
+      photos: json['photos'] is List
+          ? (json['photos'] as List).whereType<String>().toList()
+          : const [],
+      sellerResponse: json.asStringOrNull('seller_response'),
+      adminNote: json.asStringOrNull('admin_note'),
+      deadlineAt: json.asStringOrNull('deadline_at'),
+      escalatedAt: json.asStringOrNull('escalated_at'),
+      resolvedAt: json.asStringOrNull('resolved_at'),
+      createdAt: json.asStringOrNull('created_at'),
     );
   }
 }

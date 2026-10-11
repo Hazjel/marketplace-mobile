@@ -9,6 +9,8 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/seller/orders/viewmodels/seller_order_detail_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
+import 'package:blukios_marketplace/features/transaction/widgets/complaint_details.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -90,7 +92,13 @@ class _SellerOrderDetailScreenState
   Future<void> _rejectOrder() async {
     final reason = await showDialog<String>(
       context: context,
-      builder: (_) => const _RejectOrderDialog(),
+      builder: (_) => const _ReasonDialog(
+        title: 'Tolak Pesanan?',
+        message: 'Stok dikembalikan dan pembeli mendapat refund penuh.',
+        label: 'Alasan (dilihat pembeli)',
+        hint: 'Contoh: stok habis',
+        maxLength: 255,
+      ),
     );
     if (reason == null || !mounted) return;
 
@@ -105,6 +113,61 @@ class _SellerOrderDetailScreenState
         content: Text(success
             ? 'Pesanan ditolak, dana pembeli sedang dikembalikan'
             : error ?? 'Gagal menolak pesanan'),
+        backgroundColor: success ? null : AppTheme.error,
+      ),
+    );
+  }
+
+  Future<void> _acceptComplaint(TransactionModel order, TransactionComplaint complaint) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Setujui Komplain?'),
+        content: Text(
+          'Seluruh dana pesanan (${CurrencyFormatter.formatRupiah(order.grandTotal)}) '
+          'dikembalikan ke pembeli dan stok produk TIDAK dikembalikan.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Setujui & Refund'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await ref
+        .read(sellerOrderDetailProvider(widget.orderId).notifier)
+        .acceptComplaint(complaint.id);
+    _showComplaintResult(success, 'Komplain diterima, dana pembeli sedang dikembalikan');
+  }
+
+  Future<void> _rejectComplaint(TransactionComplaint complaint) async {
+    final response = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ReasonDialog(
+        title: 'Tolak Komplain?',
+        message: 'Komplain akan diteruskan ke admin untuk diputuskan.',
+        label: 'Tanggapan untuk pembeli',
+        maxLength: 1000,
+      ),
+    );
+    if (response == null || !mounted) return;
+
+    final success = await ref
+        .read(sellerOrderDetailProvider(widget.orderId).notifier)
+        .rejectComplaint(complaint.id, response);
+    _showComplaintResult(success, 'Komplain diteruskan ke admin');
+  }
+
+  void _showComplaintResult(bool success, String message) {
+    if (!mounted) return;
+    final error = ref.read(sellerOrderDetailProvider(widget.orderId)).updateError;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? message : error ?? 'Gagal memperbarui komplain'),
         backgroundColor: success ? null : AppTheme.error,
       ),
     );
@@ -265,6 +328,46 @@ class _SellerOrderDetailScreenState
                               ),
                             ),
                             const SizedBox(height: AppTheme.spacingMD),
+                            if (order.complaint case final complaint?) ...[
+                              _SectionCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text('Komplain Pembeli', style: AppTheme.titleSm),
+                                    const SizedBox(height: AppTheme.spacingSM),
+                                    ComplaintDetails(complaint: complaint),
+                                    if (complaint.status == 'open') ...[
+                                      const SizedBox(height: AppTheme.spacingLG),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: data.isUpdating
+                                                  ? null
+                                                  : () => _rejectComplaint(complaint),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: AppTheme.error,
+                                              ),
+                                              child: const Text('Tolak'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: AppTheme.spacingSM),
+                                          Expanded(
+                                            child: ElevatedButton(
+                                              onPressed: data.isUpdating
+                                                  ? null
+                                                  : () => _acceptComplaint(order, complaint),
+                                              child: const Text('Setujui & Refund'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMD),
+                            ],
                             if (order.deliveryStatus == 'completed') ...[
                               _SectionCard(
                                 child: Row(
@@ -450,14 +553,28 @@ class _SellerOrderDetailScreenState
   }
 }
 
-class _RejectOrderDialog extends StatefulWidget {
-  const _RejectOrderDialog();
+/// Asks for a required text the buyer will see (5 to [maxLength] chars,
+/// same as the API), returning it trimmed.
+class _ReasonDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String label;
+  final String? hint;
+  final int maxLength;
+
+  const _ReasonDialog({
+    required this.title,
+    required this.message,
+    required this.label,
+    this.hint,
+    required this.maxLength,
+  });
 
   @override
-  State<_RejectOrderDialog> createState() => _RejectOrderDialogState();
+  State<_ReasonDialog> createState() => _ReasonDialogState();
 }
 
-class _RejectOrderDialogState extends State<_RejectOrderDialog> {
+class _ReasonDialogState extends State<_ReasonDialog> {
   final _controller = TextEditingController();
 
   @override
@@ -466,30 +583,26 @@ class _RejectOrderDialogState extends State<_RejectOrderDialog> {
     super.dispose();
   }
 
-  // The API accepts 5-255 characters.
   bool get _valid => _controller.text.trim().length >= 5;
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Tolak Pesanan?'),
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Stok dikembalikan dan pembeli mendapat refund penuh.'),
+          Text(widget.message),
           const SizedBox(height: AppTheme.spacingMD),
           TextField(
             controller: _controller,
-            maxLength: 255,
+            maxLength: widget.maxLength,
             maxLines: 3,
             minLines: 1,
             autofocus: true,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Alasan (dilihat pembeli)',
-              hintText: 'Contoh: stok habis',
-            ),
+            decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
           ),
         ],
       ),

@@ -192,4 +192,66 @@ void main() {
       expect(container.read(transactionProvider).transactions.single.refundAccount, isNull);
     });
   });
+
+  group('complaints', () {
+    TransactionModel withComplaint(String status) => TransactionModel(
+          id: 't1',
+          code: 'TRX-t1',
+          shippingCost: 0,
+          deliveryStatus: 'delivering',
+          tax: 0,
+          grandTotal: 26000,
+          paymentStatus: 'paid',
+          transactionDetails: const [],
+          complaint: TransactionComplaint(id: 'c1', status: status),
+        );
+
+    setUp(() async {
+      when(() => transactionRepository.getTransactions())
+          .thenAnswer((_) async => [_transaction(id: 't1', paymentStatus: 'paid', deliveryStatus: 'delivering')]);
+      await container.read(transactionProvider.notifier).loadTransactions();
+    });
+
+    test('createComplaint sends the form and stores the returned order', () async {
+      when(() => transactionRepository.createComplaint(
+            id: 't1',
+            reason: 'damaged',
+            description: 'Kemasan penyok parah',
+            photoPaths: ['/tmp/a.jpg'],
+          )).thenAnswer((_) async => withComplaint('open'));
+
+      final error = await container.read(transactionProvider.notifier).createComplaint(
+            't1',
+            reason: 'damaged',
+            description: 'Kemasan penyok parah',
+            photoPaths: ['/tmp/a.jpg'],
+          );
+
+      expect(error, isNull);
+      expect(container.read(transactionProvider).transactions.single.complaint?.status, 'open');
+    });
+
+    test('withdrawComplaint calls the withdraw endpoint with the complaint id', () async {
+      when(() => transactionRepository.withdrawComplaint('c1'))
+          .thenAnswer((_) async => withComplaint('withdrawn'));
+
+      final error = await container.read(transactionProvider.notifier).withdrawComplaint('t1', 'c1');
+
+      expect(error, isNull);
+      verify(() => transactionRepository.withdrawComplaint('c1')).called(1);
+      expect(container.read(transactionProvider).transactions.single.complaint?.status, 'withdrawn');
+    });
+
+    test('a failed retry re-reads the order so the card shows what really happened', () async {
+      when(() => transactionRepository.withdrawComplaint('c1'))
+          .thenThrow(Exception('Status komplain sudah berubah'));
+      when(() => transactionRepository.getTransactionDetail('t1'))
+          .thenAnswer((_) async => withComplaint('withdrawn'));
+
+      final error = await container.read(transactionProvider.notifier).withdrawComplaint('t1', 'c1');
+
+      expect(error, contains('Status komplain sudah berubah'));
+      expect(container.read(transactionProvider).transactions.single.complaint?.status, 'withdrawn');
+    });
+  });
 }

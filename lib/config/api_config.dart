@@ -64,6 +64,13 @@ class ApiConfig {
   static String transactionCancel(String id) => '/transaction/$id/cancel';
   static String transactionRefundAccount(String id) => '/transaction/$id/refund-account';
 
+  // Buyer complaint on a delivering order. The id after /complaint is the
+  // complaint's, not the order's.
+  static String transactionComplaint(String transactionId) => '/transaction/$transactionId/complaint';
+  static String complaintWithdraw(String id) => '/complaint/$id/withdraw';
+  static String complaintAccept(String id) => '/complaint/$id/accept';
+  static String complaintReject(String id) => '/complaint/$id/reject';
+
   // Search & filters (3a)
   static const String productSearch = '/product/all/paginated';
   static const String searchSuggestions = '/search/suggestions';

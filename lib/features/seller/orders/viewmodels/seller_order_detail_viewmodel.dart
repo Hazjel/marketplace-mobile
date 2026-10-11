@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
 class SellerOrderDetailData {
@@ -108,6 +110,47 @@ class SellerOrderDetailNotifier
     } catch (e) {
       if (_disposed) return false;
       state = state.copyWith(isUpdating: false, updateError: e.toString());
+      return false;
+    }
+  }
+
+  /// Accepts the buyer's open complaint: full refund, stock not returned.
+  /// Returns true on success.
+  Future<bool> acceptComplaint(String complaintId) =>
+      _complaintAction((repo) => repo.acceptComplaint(complaintId));
+
+  /// Rejects the buyer's open complaint with [response]; an admin decides.
+  /// Returns true on success.
+  Future<bool> rejectComplaint(String complaintId, String response) =>
+      _complaintAction((repo) => repo.rejectComplaint(complaintId, response));
+
+  /// On failure the order is re-read, so a retry after a lost response (or
+  /// a deadline that just passed) shows the complaint's real status.
+  Future<bool> _complaintAction(
+    Future<TransactionModel> Function(TransactionRepository repo) action,
+  ) async {
+    if (state.isUpdating) return false;
+    state = state.copyWith(isUpdating: true, clearUpdateError: true);
+    final repo = ref.read(transactionRepositoryProvider);
+
+    try {
+      final updated = await action(repo);
+      if (_disposed) return false;
+      state = state.copyWith(order: updated, isUpdating: false);
+      return true;
+    } catch (e) {
+      TransactionModel? fresh;
+      try {
+        fresh = await repo.getTransactionDetail(arg);
+      } catch (_) {
+        // Best effort: the action's own error is what the seller needs.
+      }
+      if (_disposed) return false;
+      state = state.copyWith(
+        order: fresh,
+        isUpdating: false,
+        updateError: e is ValidationException ? e.firstError : e.toString(),
+      );
       return false;
     }
   }

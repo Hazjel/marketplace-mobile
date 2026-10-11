@@ -43,6 +43,8 @@ import 'package:blukios_marketplace/features/seller/wallet/screens/seller_wallet
 import 'package:blukios_marketplace/features/seller/wallet/screens/withdrawal_form_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_detail_screen.dart';
 import 'package:blukios_marketplace/features/store/screens/store_list_screen.dart';
+import 'package:blukios_marketplace/features/transaction/screens/complaint_form_screen.dart';
+import 'package:blukios_marketplace/features/transaction/screens/complaint_screen.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
 import 'package:blukios_marketplace/features/wishlist/screens/wishlist_screen.dart';
 import 'package:blukios_marketplace/shared/widgets/app_shell.dart';
@@ -83,6 +85,8 @@ class AppRoutes {
   /// Chatbot RAG (chat-service), bukan chat antar pengguna di atas.
   static const String aiChat = '/ai-chat';
   static const String reviewForm = '/review/:transactionId/:productId';
+  static const String complaint = '/complaint/:transactionId';
+  static const String complaintForm = '/complaint/:transactionId/new';
 
   // Seller Centre — full-screen pushes from the "Toko Saya"/"Jualan"
   // section on AccountScreen, gated by role in the redirect callback below.
@@ -107,6 +111,8 @@ class AppRoutes {
   static String reviewFormPath(String transactionId, String productId) =>
       '/review/$transactionId/$productId';
   static String sellerOrderDetailPath(String id) => '/seller/orders/$id';
+  static String complaintPath(String transactionId) => '/complaint/$transactionId';
+  static String complaintFormPath(String transactionId) => '/complaint/$transactionId/new';
 
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -327,6 +333,20 @@ class AppRoutes {
           parentNavigatorKey: _rootNavigatorKey,
           builder: (context, state) => ChatThreadScreen(
             partnerId: state.pathParameters['partnerId'] ?? '',
+          ),
+        ),
+        GoRoute(
+          path: complaint,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => ComplaintScreen(
+            transactionId: state.pathParameters['transactionId'] ?? '',
+          ),
+        ),
+        GoRoute(
+          path: complaintForm,
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (context, state) => ComplaintFormScreen(
+            transactionId: state.pathParameters['transactionId'] ?? '',
           ),
         ),
         GoRoute(

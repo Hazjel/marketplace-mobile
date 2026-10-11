@@ -114,6 +114,38 @@ void main() {
       final none = TransactionModel.fromJson(_fixture()..['complaint'] = null);
       expect(none.complaint, isNull);
       expect(none.hasActiveComplaint, isFalse);
+      expect(TransactionModel.fromJson(_fixture()).complaint, isNull);
+    });
+
+    test('parses the full complaint from TransactionResource', () {
+      final c = TransactionModel.fromJson(_fixture()
+            ..['complaint'] = {
+              'id': 'c1',
+              'reason': 'wrong_item',
+              'description': 'Warna barang tidak sesuai pesanan',
+              'photos': ['https://blukios.store/storage/complaints/a.jpg'],
+              'status': 'escalated',
+              'seller_response': 'Sudah sesuai foto produk',
+              'admin_note': null,
+              'deadline_at': '2026-10-14T07:30:00.000000Z',
+              'escalated_at': '2026-10-13T01:00:00.000000Z',
+              'resolved_at': null,
+              'created_at': '2026-10-12T07:30:00.000000Z',
+            })
+          .complaint!;
+
+      expect(c.reasonLabel, 'Barang salah');
+      expect(c.statusLabel, 'Ditinjau admin');
+      expect(c.description, 'Warna barang tidak sesuai pesanan');
+      expect(c.photos, ['https://blukios.store/storage/complaints/a.jpg']);
+      expect(c.sellerResponse, 'Sudah sesuai foto produk');
+      expect(c.adminNote, isNull);
+      expect(c.deadlineAt, '2026-10-14T07:30:00.000000Z');
+      expect(c.escalatedAt, '2026-10-13T01:00:00.000000Z');
+      expect(c.resolvedAt, isNull);
+      expect(c.createdAt, '2026-10-12T07:30:00.000000Z');
+      expect(TransactionComplaint.fromJson(const {'id': 'c2', 'status': 'approved'}).statusLabel,
+          'Disetujui – dana dikembalikan');
     });
   });
 

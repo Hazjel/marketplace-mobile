@@ -149,4 +149,53 @@ void main() {
     expect(find.text('Konfirmasi Pesanan Diterima'), findsOneWidget);
     expect(find.textContaining('Komplain sedang diproses'), findsNothing);
   });
+
+  group('complaint entry', () {
+    testWidgets('a paid, delivering order without a complaint offers "Ajukan Komplain"',
+        (tester) async {
+      await pumpList(tester, [delivering()]);
+
+      expect(find.text('Ajukan Komplain'), findsOneWidget);
+      expect(find.text('Lihat Komplain'), findsNothing);
+    });
+
+    testWidgets('an order with a complaint offers "Lihat Komplain" with its status',
+        (tester) async {
+      await pumpList(tester, [
+        delivering(complaint: const TransactionComplaint(id: 'c1', status: 'open')),
+      ]);
+
+      expect(find.text('Lihat Komplain'), findsOneWidget);
+      expect(find.text('Menunggu tanggapan penjual'), findsOneWidget);
+      expect(find.text('Ajukan Komplain'), findsNothing);
+    });
+
+    testWidgets('a withdrawn complaint cannot be filed again', (tester) async {
+      await pumpList(tester, [
+        delivering(complaint: const TransactionComplaint(id: 'c1', status: 'withdrawn')),
+      ]);
+
+      expect(find.text('Lihat Komplain'), findsOneWidget);
+      expect(find.text('Ajukan Komplain'), findsNothing);
+    });
+
+    testWidgets('orders not on their way offer neither', (tester) async {
+      await pumpList(tester, [
+        TransactionModel(
+          id: 't5',
+          code: 'TRX-t5',
+          shippingCost: 0,
+          deliveryStatus: 'processing',
+          tax: 0,
+          grandTotal: 50000,
+          paymentStatus: 'paid',
+          transactionDetails: const [],
+        ),
+        _cancelled(),
+      ]);
+
+      expect(find.text('Ajukan Komplain'), findsNothing);
+      expect(find.text('Lihat Komplain'), findsNothing);
+    });
+  });
 }
