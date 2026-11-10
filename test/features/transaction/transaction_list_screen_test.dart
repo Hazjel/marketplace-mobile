@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -337,6 +340,80 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Too Many Attempts.'), findsOneWidget);
+    });
+
+    // What ApiClient throws when there is no HTTP response at all.
+    ApiException offline() => ApiException.fromDioError(
+          DioException(requestOptions: RequestOptions(), type: DioExceptionType.connectionError),
+        );
+
+    testWidgets('no connection while loading the preview shows the message and changes nothing', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Batalkan Pesanan'), findsOneWidget);
+      expect(find.text('TRX-t1'), findsOneWidget);
+      verifyNever(() => repository.cancelUnpaid(any()));
+      verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
+    });
+
+    testWidgets('no connection while cancelling shows the message, re-enables the action and does not retry', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.text('TRX-t1'), findsOneWidget);
+      final action = find.widgetWithText(OutlinedButton, 'Batalkan Pesanan');
+      expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
+    });
+
+    testWidgets('repeated taps on the action and on confirm send the cancellation once', (tester) async {
+      final preview = Completer<List<TransactionModel>>();
+      final cancel = Completer<CancelUnpaidResult>();
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) => preview.future);
+      when(() => repository.cancelUnpaid('t1')).thenAnswer((_) => cancel.future);
+      await pumpList(tester, [_order('t1')]);
+
+      // Action tapped again while the preview is still loading.
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pump();
+      await tester.tap(find.text('Memproses pembatalan...'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => repository.previewCancelUnpaid('t1')).called(1);
+
+      preview.complete([_order('t1')]);
+      await tester.pumpAndSettle();
+
+      // Confirm tapped twice, a frame apart, while the cancellation is in flight.
+      final confirm = find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan'));
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.tap(confirm, warnIfMissed: false);
+      await tester.pump();
+      await tester.tap(find.text('Memproses pembatalan...'), warnIfMissed: false);
+      await tester.pump();
+
+      cancel.complete(const CancelUnpaidResult(message: 'Pesanan dibatalkan.', orders: []));
+      await tester.pumpAndSettle();
+
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verifyNever(() => repository.previewCancelUnpaid('t1')); // no preview beyond the one verified above
+      expect(find.text('Pesanan dibatalkan.'), findsOneWidget);
     });
 
     testWidgets('the action is offered for a pending order too', (tester) async {
