@@ -3,6 +3,16 @@ import 'package:blukios_marketplace/config/api_config.dart';
 import 'package:blukios_marketplace/core/network/api_client.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 
+/// What `POST /transaction/{id}/cancel-unpaid` answers: the API's own
+/// message (it says when Saldo Blukios was returned) and every order that
+/// was cancelled with it.
+class CancelUnpaidResult {
+  final String message;
+  final List<TransactionModel> orders;
+
+  const CancelUnpaidResult({required this.message, required this.orders});
+}
+
 class TransactionRepository {
   final ApiClient _apiClient;
 
@@ -16,9 +26,8 @@ class TransactionRepository {
     // TransactionRepository::scopeToMode() reads this to decide whether the
     // paginated list is scoped to the caller's buyer_id or store_id — a user
     // can be dual-role buyer+store (like Shopee), so without it the backend
-    // can't tell which context is being asked for. Pass 'store' for the
-    // seller order list; leave null for the existing buyer call sites (their
-    // behavior is unchanged).
+    // can't tell which context is being asked for. Pass 'buyer' for the
+    // buyer order list and 'store' for the seller one.
     String? mode,
   }) async {
     final response = await _apiClient.get(
@@ -161,6 +170,27 @@ class TransactionRepository {
       data: {'reason': reason},
     );
     return TransactionModel.fromJson(response.data['data']);
+  }
+
+  /// Every order in the same payment as [id] — one payment can cover several
+  /// stores and cancelling one cancels all of them. `GET
+  /// /transaction/{id}/cancel-unpaid`.
+  Future<List<TransactionModel>> previewCancelUnpaid(String id) async {
+    final response = await _apiClient.get(ApiConfig.transactionCancelUnpaid(id));
+    final List data = response.data['data'] ?? const [];
+    return data.map((e) => TransactionModel.fromJson(e)).toList();
+  }
+
+  /// Buyer cancels an order that is not paid yet, and with it every other
+  /// order of the same payment — `POST /transaction/{id}/cancel-unpaid`
+  /// (throttled 10/min). Any Saldo Blukios used is returned by the API.
+  Future<CancelUnpaidResult> cancelUnpaid(String id) async {
+    final response = await _apiClient.post(ApiConfig.transactionCancelUnpaid(id));
+    final List orders = response.data['data']?['cancelled_orders'] ?? const [];
+    return CancelUnpaidResult(
+      message: response.data['message'] ?? 'Pesanan dibatalkan.',
+      orders: orders.map((e) => TransactionModel.fromJson(e)).toList(),
+    );
   }
 
   /// Buyer gives the bank account for a manual refund (`refund_status` =

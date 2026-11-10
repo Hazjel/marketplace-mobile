@@ -1,8 +1,14 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
+import 'package:blukios_marketplace/features/auth/models/user_model.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/transaction/data/transaction_repository.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/screens/transaction_list_screen.dart';
@@ -28,16 +34,58 @@ TransactionModel _cancelled({String refundStatus = 'manual_required', RefundAcco
   );
 }
 
+class _FakeAuth extends AuthNotifier {
+  final String? userId;
+
+  _FakeAuth(this.userId);
+
+  @override
+  AuthData build() => AuthData(
+        currentUser: userId == null
+            ? null
+            : UserModel(id: userId!, name: 'U', email: 'u@x.id', role: 'buyer'),
+      );
+}
+
+TransactionModel _order(
+  String id, {
+  String paymentStatus = 'unpaid',
+  String deliveryStatus = 'pending',
+  String buyerUserId = 'buyer-1',
+  String store = 'Toko Satu',
+  double total = 26000,
+}) {
+  return TransactionModel(
+    id: id,
+    code: 'TRX-$id',
+    storeName: store,
+    buyerUserId: buyerUserId,
+    shippingCost: 5000,
+    deliveryStatus: deliveryStatus,
+    tax: 0,
+    grandTotal: total,
+    paymentStatus: paymentStatus,
+    transactionDetails: const [],
+  );
+}
+
 void main() {
   late MockTransactionRepository repository;
 
   setUp(() => repository = MockTransactionRepository());
 
-  Future<void> pumpList(WidgetTester tester, List<TransactionModel> transactions) async {
-    when(() => repository.getTransactions()).thenAnswer((_) async => transactions);
+  Future<void> pumpList(
+    WidgetTester tester,
+    List<TransactionModel> transactions, {
+    String? userId = 'buyer-1',
+  }) async {
+    when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) async => transactions);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          transactionRepositoryProvider.overrideWithValue(repository),
+          authProvider.overrideWith(() => _FakeAuth(userId)),
+        ],
         child: const MaterialApp(home: TransactionListScreen()),
       ),
     );
@@ -218,5 +266,174 @@ void main() {
       expect(find.text('Ajukan Komplain'), findsNothing);
       expect(find.text('Lihat Komplain'), findsNothing);
     });
+  });
+
+  group('cancel an unpaid order', () {
+    testWidgets('lists every order of the payment, cancels once and refreshes the list', (tester) async {
+      final orders = [
+        _order('t1', store: 'Toko Satu', total: 26000),
+        _order('t2', store: 'Toko Dua', total: 41000),
+      ];
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => orders);
+      when(() => repository.cancelUnpaid('t1')).thenAnswer((_) async => const CancelUnpaidResult(
+            message: 'Pesanan dibatalkan. Saldo Blukios yang digunakan sudah dikembalikan.',
+            orders: [],
+          ));
+      await pumpList(tester, [orders.first]);
+      clearInteractions(repository);
+      when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) async => []);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Batalkan pesanan dalam pembayaran ini?'), findsOneWidget);
+      expect(find.text('TRX-t1 - Toko Satu\nRp 26.000'), findsOneWidget);
+      expect(find.text('TRX-t2 - Toko Dua\nRp 41.000'), findsOneWidget);
+      expect(find.textContaining('Semua pesanan di atas dibatalkan.'), findsOneWidget);
+      verifyNever(() => repository.cancelUnpaid(any()));
+
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
+      await tester.pumpAndSettle();
+
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verify(() => repository.getTransactions(mode: 'buyer')).called(1);
+      expect(find.text('Pesanan dibatalkan. Saldo Blukios yang digunakan sudah dikembalikan.'), findsOneWidget);
+      expect(find.text('Batalkan Pesanan'), findsNothing);
+    });
+
+    testWidgets('going back from the confirmation cancels nothing', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      await pumpList(tester, [_order('t1')]);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kembali'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repository.cancelUnpaid(any()));
+      expect(find.text('Batalkan Pesanan'), findsOneWidget);
+    });
+
+    testWidgets('a failed preview shows the API message and opens no confirmation', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenThrow(
+        ApiException(message: 'Anda tidak memiliki izin untuk membatalkan pesanan ini', statusCode: 403),
+      );
+      await pumpList(tester, [_order('t1')]);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Anda tidak memiliki izin untuk membatalkan pesanan ini'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      verifyNever(() => repository.cancelUnpaid(any()));
+    });
+
+    testWidgets('a failed cancel shows the API message as returned', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1'))
+          .thenThrow(ApiException(message: 'Too Many Attempts.', statusCode: 429));
+      await pumpList(tester, [_order('t1')]);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Too Many Attempts.'), findsOneWidget);
+    });
+
+    // What ApiClient throws when there is no HTTP response at all.
+    ApiException offline() => ApiException.fromDioError(
+          DioException(requestOptions: RequestOptions(), type: DioExceptionType.connectionError),
+        );
+
+    testWidgets('no connection while loading the preview shows the message and changes nothing', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Batalkan Pesanan'), findsOneWidget);
+      expect(find.text('TRX-t1'), findsOneWidget);
+      verifyNever(() => repository.cancelUnpaid(any()));
+      verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
+    });
+
+    testWidgets('no connection while cancelling shows the message, re-enables the action and does not retry', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.text('TRX-t1'), findsOneWidget);
+      final action = find.widgetWithText(OutlinedButton, 'Batalkan Pesanan');
+      expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
+    });
+
+    testWidgets('repeated taps on the action and on confirm send the cancellation once', (tester) async {
+      final preview = Completer<List<TransactionModel>>();
+      final cancel = Completer<CancelUnpaidResult>();
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) => preview.future);
+      when(() => repository.cancelUnpaid('t1')).thenAnswer((_) => cancel.future);
+      await pumpList(tester, [_order('t1')]);
+
+      // Action tapped again while the preview is still loading.
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pump();
+      await tester.tap(find.text('Memproses pembatalan...'), warnIfMissed: false);
+      await tester.pump();
+      verify(() => repository.previewCancelUnpaid('t1')).called(1);
+
+      preview.complete([_order('t1')]);
+      await tester.pumpAndSettle();
+
+      // Confirm tapped twice, a frame apart, while the cancellation is in flight.
+      final confirm = find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan'));
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.tap(confirm, warnIfMissed: false);
+      await tester.pump();
+      await tester.tap(find.text('Memproses pembatalan...'), warnIfMissed: false);
+      await tester.pump();
+
+      cancel.complete(const CancelUnpaidResult(message: 'Pesanan dibatalkan.', orders: []));
+      await tester.pumpAndSettle();
+
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verifyNever(() => repository.previewCancelUnpaid('t1')); // no preview beyond the one verified above
+      expect(find.text('Pesanan dibatalkan.'), findsOneWidget);
+    });
+
+    testWidgets('the action is offered for a pending order too', (tester) async {
+      await pumpList(tester, [_order('t1', paymentStatus: 'pending')]);
+
+      expect(find.text('Batalkan Pesanan'), findsOneWidget);
+    });
+
+    for (final (name, order, userId) in <(String, TransactionModel, String?)>[
+      ('paid', _order('t1', paymentStatus: 'paid', deliveryStatus: 'processing'), 'buyer-1'),
+      ('cancelled', _order('t1', paymentStatus: 'failed', deliveryStatus: 'cancelled'), 'buyer-1'),
+      ('expired', _order('t1', paymentStatus: 'expired'), 'buyer-1'),
+      ('placed by someone else', _order('t1', buyerUserId: 'buyer-2'), 'buyer-1'),
+      ('not signed in', _order('t1'), null),
+    ]) {
+      testWidgets('no action on an order that is $name', (tester) async {
+        await pumpList(tester, [order], userId: userId);
+
+        expect(find.text('Batalkan Pesanan'), findsNothing);
+      });
+    }
   });
 }

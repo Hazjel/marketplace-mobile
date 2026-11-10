@@ -43,7 +43,7 @@ void main() {
   group('loadTransactions', () {
     test('populates the list on success', () async {
       final transactions = [_transaction(id: 't1'), _transaction(id: 't2')];
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => transactions);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => transactions);
 
       await container.read(transactionProvider.notifier).loadTransactions();
 
@@ -51,13 +51,22 @@ void main() {
       expect(state.transactions, transactions);
       expect(state.isLoading, isFalse);
     });
+
+    test('asks for the buyer orders, not the store orders', () async {
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => []);
+
+      await container.read(transactionProvider.notifier).loadTransactions();
+
+      verify(() => transactionRepository.getTransactions(mode: 'buyer')).called(1);
+      verifyNever(() => transactionRepository.getTransactions(mode: 'store'));
+    });
   });
 
   group('refreshStatus', () {
     test('updates only the matching transaction in place', () async {
       final t1 = _transaction(id: 't1', paymentStatus: 'pending');
       final t2 = _transaction(id: 't2', paymentStatus: 'pending');
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [t1, t2]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [t1, t2]);
       await container.read(transactionProvider.notifier).loadTransactions();
 
       final t1Updated = _transaction(id: 't1', paymentStatus: 'paid');
@@ -74,7 +83,7 @@ void main() {
 
     test('failure returns the error message and leaves state unchanged', () async {
       final t1 = _transaction(id: 't1');
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [t1]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [t1]);
       await container.read(transactionProvider.notifier).loadTransactions();
       when(() => transactionRepository.checkPaymentStatus('t1'))
           .thenThrow(Exception('Gagal cek status'));
@@ -90,7 +99,7 @@ void main() {
     test('adds the product id to the matching transaction only', () async {
       final t1 = _transaction(id: 't1');
       final t2 = _transaction(id: 't2');
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [t1, t2]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [t1, t2]);
       await container.read(transactionProvider.notifier).loadTransactions();
 
       container.read(transactionProvider.notifier).markReviewed('t1', 'prod-1');
@@ -104,7 +113,7 @@ void main() {
   group('completeOrder', () {
     test('updates the transaction with the server response on success', () async {
       final t1 = _transaction(id: 't1', deliveryStatus: 'delivering');
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [t1]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [t1]);
       await container.read(transactionProvider.notifier).loadTransactions();
 
       final completed = _transaction(id: 't1', deliveryStatus: 'completed');
@@ -122,7 +131,7 @@ void main() {
 
     test('failure returns the error message without changing state', () async {
       final t1 = _transaction(id: 't1', deliveryStatus: 'delivering');
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [t1]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [t1]);
       await container.read(transactionProvider.notifier).loadTransactions();
 
       when(() => transactionRepository.completeOrder(
@@ -170,7 +179,7 @@ void main() {
     }
 
     setUp(() async {
-      when(() => transactionRepository.getTransactions()).thenAnswer((_) async => [cancelled()]);
+      when(() => transactionRepository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [cancelled()]);
       await container.read(transactionProvider.notifier).loadTransactions();
     });
 
@@ -207,7 +216,7 @@ void main() {
         );
 
     setUp(() async {
-      when(() => transactionRepository.getTransactions())
+      when(() => transactionRepository.getTransactions(mode: 'buyer'))
           .thenAnswer((_) async => [_transaction(id: 't1', paymentStatus: 'paid', deliveryStatus: 'delivering')]);
       await container.read(transactionProvider.notifier).loadTransactions();
     });
