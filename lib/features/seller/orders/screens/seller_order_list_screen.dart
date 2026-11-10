@@ -6,7 +6,9 @@ import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/seller/orders/viewmodels/seller_order_list_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/models/ship_deadline.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
+import 'package:blukios_marketplace/features/transaction/widgets/ship_deadline_notice.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -189,6 +191,10 @@ class _OrderCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (resolveShipDeadline(order) != null) ...[
+              const SizedBox(height: AppTheme.spacingMD),
+              ShipDeadlineNotice(order: order),
+            ],
           ],
         ),
       ),

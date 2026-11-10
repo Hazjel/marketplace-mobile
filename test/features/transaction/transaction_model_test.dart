@@ -17,6 +17,28 @@ Map<String, dynamic> _fixture({Object? discountAmount = 5000}) => {
 
 void main() {
   group('TransactionModel.fromJson', () {
+    test('parses paid_at and ship_deadline_at when the API sends them', () {
+      final t = TransactionModel.fromJson({
+        ..._fixture(),
+        'paid_at': '2026-11-11T01:00:00.000000Z',
+        'ship_deadline_at': '2026-11-14T01:00:00.000000Z',
+      });
+
+      expect(t.paidAt, '2026-11-11T01:00:00.000000Z');
+      expect(t.shipDeadlineAt, '2026-11-14T01:00:00.000000Z');
+      expect(t.copyWith().shipDeadlineAt, '2026-11-14T01:00:00.000000Z');
+    });
+
+    test('paid_at and ship_deadline_at are null on older responses or explicit null', () {
+      final old = TransactionModel.fromJson(_fixture());
+      expect(old.paidAt, isNull);
+      expect(old.shipDeadlineAt, isNull);
+
+      final nulls = TransactionModel.fromJson({..._fixture(), 'paid_at': null, 'ship_deadline_at': null});
+      expect(nulls.paidAt, isNull);
+      expect(nulls.shipDeadlineAt, isNull);
+    });
+
     // Sprint C1 (money-json-contract.md): shipping_cost/tax/grand_total/
     // discount_amount/subtotal are always a JSON integer now, never a
     // decimal:2 string or a float.

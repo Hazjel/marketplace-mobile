@@ -53,6 +53,27 @@ void main() {
     expect(find.text('Isi Rekening Refund'), findsOneWidget);
   });
 
+  testWidgets('a paid order not shipped yet tells the buyer the deadline and the auto-refund', (tester) async {
+    final deadline = DateTime.now().toUtc().add(const Duration(days: 2, hours: 3)).toIso8601String();
+    await pumpList(tester, [
+      TransactionModel(
+        id: 't2',
+        code: 'TRX-t2',
+        shippingCost: 5000,
+        deliveryStatus: 'processing',
+        tax: 0,
+        grandTotal: 26000,
+        paymentStatus: 'paid',
+        shipDeadlineAt: deadline,
+        transactionDetails: const [],
+      ),
+    ]);
+
+    expect(find.textContaining('Penjual wajib mengirim sebelum '), findsOneWidget);
+    expect(find.textContaining('Jika belum dikirim, pesanan dibatalkan dan dana dikembalikan otomatis.'),
+        findsOneWidget);
+  });
+
   testWidgets('the account form rejects a non-numeric account number', (tester) async {
     await pumpList(tester, [_cancelled()]);
 

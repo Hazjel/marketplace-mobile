@@ -38,6 +38,11 @@ class TransactionModel {
   final String paymentStatus;
   final String? snapToken;
   final String? createdAt;
+
+  /// ISO UTC. Null on older API responses. Past [shipDeadlineAt] an unshipped
+  /// paid order is cancelled and refunded automatically.
+  final String? paidAt;
+  final String? shipDeadlineAt;
   final List<TransactionDetailModel> transactionDetails;
 
   /// Refund for an order the seller rejected after payment: null when no
@@ -91,6 +96,8 @@ class TransactionModel {
     required this.paymentStatus,
     this.snapToken,
     this.createdAt,
+    this.paidAt,
+    this.shipDeadlineAt,
     required this.transactionDetails,
     this.reviewedProductIds = const {},
     this.refundStatus,
@@ -134,6 +141,8 @@ class TransactionModel {
       paymentStatus: json['payment_status'] ?? 'pending',
       snapToken: json['snap_token'],
       createdAt: json['created_at'],
+      paidAt: json.asStringOrNull('paid_at'),
+      shipDeadlineAt: json.asStringOrNull('ship_deadline_at'),
       transactionDetails: json['transaction_details'] != null
           ? (json['transaction_details'] as List)
               .map((e) => TransactionDetailModel.fromJson(e))
@@ -190,6 +199,8 @@ class TransactionModel {
       paymentStatus: paymentStatus,
       snapToken: snapToken,
       createdAt: createdAt,
+      paidAt: paidAt,
+      shipDeadlineAt: shipDeadlineAt,
       transactionDetails: transactionDetails,
       reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
       refundStatus: refundStatus,
