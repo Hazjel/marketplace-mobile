@@ -29,6 +29,22 @@ TransactionModel _order(String complaintStatus, {String? sellerResponse}) => Tra
       ),
     );
 
+TransactionModel _unshipped({String deliveryStatus = 'processing', String? tracking, String? deadline}) =>
+    TransactionModel(
+      id: 'o1',
+      code: 'TRX-o1',
+      shippingCost: 5000,
+      deliveryStatus: deliveryStatus,
+      trackingNumber: tracking,
+      tax: 0,
+      grandTotal: 26000,
+      paymentStatus: 'paid',
+      shipDeadlineAt: deadline,
+      transactionDetails: const [],
+    );
+
+const _resiHint = 'Isi nomor resi dulu untuk menandai pesanan dikirim.';
+
 void main() {
   late MockTransactionRepository repository;
 
@@ -106,5 +122,55 @@ void main() {
 
     verify(() => repository.rejectComplaint('c1', 'Barang sudah sesuai foto')).called(1);
     expect(find.text('Ditinjau admin'), findsOneWidget);
+  });
+
+  group('ship action', () {
+    VoidCallback? shipPressed(WidgetTester tester) => tester
+        .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Tandai Dikirim'))
+        .onPressed;
+
+    testWidgets('is disabled while the resi is empty and enabled once one is typed', (tester) async {
+      await pumpDetail(tester, _unshipped());
+
+      expect(shipPressed(tester), isNull);
+      expect(find.text(_resiHint), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'JNE123');
+      await tester.pump();
+      expect(shipPressed(tester), isNotNull);
+      expect(find.text(_resiHint), findsNothing);
+
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.pump();
+      expect(shipPressed(tester), isNull);
+    });
+
+    testWidgets('is enabled right away when the order already has a resi', (tester) async {
+      await pumpDetail(tester, _unshipped(tracking: 'JNE123'));
+      expect(shipPressed(tester), isNotNull);
+    });
+
+    testWidgets('an order already delivering shows no resi hint and keeps the field editable', (tester) async {
+      await pumpDetail(tester, _unshipped(deliveryStatus: 'delivering', tracking: 'JNE123'));
+      expect(find.text(_resiHint), findsNothing);
+      expect(tester.widget<TextField>(find.byType(TextField).first).enabled, isNot(false));
+    });
+  });
+
+  group('ship deadline', () {
+    testWidgets('shows "Kirim sebelum" with the remaining time for a paid, unshipped order', (tester) async {
+      final deadline = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30)).toIso8601String();
+      await pumpDetail(tester, _unshipped(deadline: deadline));
+
+      expect(find.textContaining('Kirim sebelum '), findsOneWidget);
+      expect(find.textContaining('Sisa 5 jam.'), findsOneWidget);
+    });
+
+    testWidgets('is hidden once the order is delivering', (tester) async {
+      final deadline = DateTime.now().toUtc().add(const Duration(days: 2)).toIso8601String();
+      await pumpDetail(tester, _unshipped(deliveryStatus: 'delivering', tracking: 'X1', deadline: deadline));
+
+      expect(find.textContaining('Kirim sebelum '), findsNothing);
+    });
   });
 }

@@ -6,9 +6,11 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
+import 'package:blukios_marketplace/features/transaction/models/ship_deadline.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
 import 'package:blukios_marketplace/features/transaction/widgets/complaint_details.dart';
+import 'package:blukios_marketplace/features/transaction/widgets/ship_deadline_notice.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -252,6 +254,10 @@ class _TransactionCard extends StatelessWidget {
           if (trx.paymentStatus == 'paid') ...[
             const SizedBox(height: AppTheme.spacingMD),
             _DeliveryStepper(status: trx.deliveryStatus),
+          ],
+          if (resolveShipDeadline(trx) != null) ...[
+            const SizedBox(height: AppTheme.spacingMD),
+            ShipDeadlineNotice(order: trx, forBuyer: true),
           ],
           const SizedBox(height: AppTheme.spacingMD),
           Divider(

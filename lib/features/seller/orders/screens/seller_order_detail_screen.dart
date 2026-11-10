@@ -9,8 +9,10 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
 import 'package:blukios_marketplace/features/seller/orders/viewmodels/seller_order_detail_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/models/ship_deadline.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/widgets/complaint_details.dart';
+import 'package:blukios_marketplace/features/transaction/widgets/ship_deadline_notice.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/skeletons.dart';
@@ -228,6 +230,10 @@ class _SellerOrderDetailScreenState
                               ),
                             ),
                             const SizedBox(height: AppTheme.spacingMD),
+                            if (resolveShipDeadline(order) != null) ...[
+                              ShipDeadlineNotice(order: order),
+                              const SizedBox(height: AppTheme.spacingMD),
+                            ],
                             _SectionCard(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,6 +435,7 @@ class _SellerOrderDetailScreenState
                                     const SizedBox(height: AppTheme.spacingSM),
                                     TextField(
                                       controller: _trackingController,
+                                      onChanged: (_) => setState(() {}),
                                       decoration: const InputDecoration(
                                         labelText: 'Nomor Resi',
                                         hintText: 'Masukkan nomor resi pengiriman',
@@ -507,8 +514,11 @@ class _SellerOrderDetailScreenState
                                         const SizedBox(width: AppTheme.spacingSM),
                                         Expanded(
                                           child: ElevatedButton(
+                                            // The API answers 422 "Nomor resi wajib diisi"
+                                            // when entering `delivering` without a resi.
                                             onPressed: data.isUpdating ||
-                                                    order.deliveryStatus == 'delivering'
+                                                    order.deliveryStatus == 'delivering' ||
+                                                    _trackingController.text.trim().isEmpty
                                                 ? null
                                                 : () => _updateStatus('delivering'),
                                             child: data.isUpdating
@@ -525,6 +535,14 @@ class _SellerOrderDetailScreenState
                                         ),
                                       ],
                                     ),
+                                    if (order.deliveryStatus != 'delivering' &&
+                                        _trackingController.text.trim().isEmpty) ...[
+                                      const SizedBox(height: AppTheme.spacingSM),
+                                      Text(
+                                        'Isi nomor resi dulu untuk menandai pesanan dikirim.',
+                                        style: AppTheme.bodySm.copyWith(color: muted),
+                                      ),
+                                    ],
                                     // Same rule as the API: paid and not shipped yet.
                                     if (order.paymentStatus == 'paid' &&
                                         const ['pending', 'processing']
