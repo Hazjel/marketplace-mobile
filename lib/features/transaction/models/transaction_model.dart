@@ -6,6 +6,9 @@ class TransactionModel {
   final String code;
   final String? storeId;
   final String? storeName;
+
+  /// `buyer.user.id`: the account that placed the order.
+  final String? buyerUserId;
   final String? addressId;
   final String? address;
   final String? city;
@@ -72,6 +75,7 @@ class TransactionModel {
     required this.code,
     this.storeId,
     this.storeName,
+    this.buyerUserId,
     this.addressId,
     this.address,
     this.city,
@@ -117,6 +121,7 @@ class TransactionModel {
       code: json['code'] ?? '',
       storeId: store != null ? store['id']?.toString() : null,
       storeName: store != null ? store['name'] : null,
+      buyerUserId: _buyerUserId(json['buyer']),
       addressId: json['address_id']?.toString(),
       address: json['address'],
       city: json['city'],
@@ -169,12 +174,25 @@ class TransactionModel {
     );
   }
 
+  static String? _buyerUserId(Object? buyer) {
+    final user = buyer is Map ? buyer['user'] : null;
+    return user is Map ? user['id']?.toString() : null;
+  }
+
+  /// Mirrors the web's CancelUnpaidButton (and the API's `cancelUnpaid`
+  /// policy): only the buyer who placed the order, and only until it is paid.
+  bool canCancelUnpaid(String? userId) =>
+      userId != null &&
+      buyerUserId == userId &&
+      const ['unpaid', 'pending'].contains(paymentStatus);
+
   TransactionModel copyWith({Set<String>? reviewedProductIds}) {
     return TransactionModel(
       id: id,
       code: code,
       storeId: storeId,
       storeName: storeName,
+      buyerUserId: buyerUserId,
       addressId: addressId,
       address: address,
       city: city,

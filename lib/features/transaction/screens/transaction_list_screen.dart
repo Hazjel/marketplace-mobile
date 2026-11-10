@@ -6,6 +6,7 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/config/routes.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/date_formatter.dart';
+import 'package:blukios_marketplace/features/auth/viewmodels/auth_viewmodel.dart';
 import 'package:blukios_marketplace/features/transaction/models/ship_deadline.dart';
 import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/features/transaction/viewmodels/transaction_viewmodel.dart';
@@ -25,6 +26,9 @@ class TransactionListScreen extends ConsumerStatefulWidget {
 }
 
 class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
+  /// Order whose cancellation is in flight; blocks a second tap.
+  String? _cancellingId;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +45,39 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: AppTheme.error),
       );
+    }
+  }
+
+  void _showMessage(String text, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: isError ? AppTheme.error : null),
+    );
+  }
+
+  /// Same flow as the web's CancelUnpaidButton: preview the whole payment,
+  /// confirm, then cancel.
+  Future<void> _cancelUnpaid(TransactionModel trx) async {
+    if (_cancellingId != null) return;
+    setState(() => _cancellingId = trx.id);
+    try {
+      final notifier = ref.read(transactionProvider.notifier);
+      final preview = await notifier.previewCancelUnpaid(trx.id);
+      if (!mounted) return;
+      if (preview.orders == null) {
+        _showMessage(preview.error!, isError: true);
+        return;
+      }
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => _CancelUnpaidDialog(orders: preview.orders!),
+      );
+      if (confirmed != true || !mounted) return;
+
+      final result = await notifier.cancelUnpaid(trx.id);
+      if (!mounted) return;
+      _showMessage(result.error ?? result.message!, isError: result.error != null);
+    } finally {
+      if (mounted) setState(() => _cancellingId = null);
     }
   }
 
@@ -120,6 +157,7 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
   Widget build(BuildContext context) {
     final viewModel = ref.watch(transactionProvider);
     final notifier = ref.read(transactionProvider.notifier);
+    final userId = ref.watch(authProvider.select((auth) => auth.currentUser?.id));
 
     return AppScaffold(
       title: 'Transaksi',
@@ -147,6 +185,10 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                         itemBuilder: (context, index) => _TransactionCard(
                           trx: viewModel.transactions[index],
                           onCheckStatus: _refreshStatus,
+                          canCancelUnpaid:
+                              viewModel.transactions[index].canCancelUnpaid(userId),
+                          cancelling: _cancellingId == viewModel.transactions[index].id,
+                          onCancelUnpaid: () => _cancelUnpaid(viewModel.transactions[index]),
                           onReview: (item) => _reviewItem(viewModel.transactions[index], item),
                           onCompleteOrder: () => _completeOrder(viewModel.transactions[index]),
                           onRefundAccount: () =>
@@ -167,6 +209,9 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 class _TransactionCard extends StatelessWidget {
   final TransactionModel trx;
   final Future<void> Function(TransactionModel) onCheckStatus;
+  final bool canCancelUnpaid;
+  final bool cancelling;
+  final VoidCallback onCancelUnpaid;
   final Future<void> Function(TransactionDetailModel) onReview;
   final VoidCallback onCompleteOrder;
   final VoidCallback onRefundAccount;
@@ -176,6 +221,9 @@ class _TransactionCard extends StatelessWidget {
   const _TransactionCard({
     required this.trx,
     required this.onCheckStatus,
+    required this.canCancelUnpaid,
+    required this.cancelling,
+    required this.onCancelUnpaid,
     required this.onReview,
     required this.onCompleteOrder,
     required this.onRefundAccount,
@@ -318,6 +366,17 @@ class _TransactionCard extends StatelessWidget {
               ),
             ),
           ],
+          if (canCancelUnpaid) ...[
+            const SizedBox(height: AppTheme.spacingSM),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: cancelling ? null : onCancelUnpaid,
+                style: OutlinedButton.styleFrom(foregroundColor: AppTheme.error),
+                child: Text(cancelling ? 'Memproses pembatalan...' : 'Batalkan Pesanan'),
+              ),
+            ),
+          ],
           if (trx.deliveryStatus == 'delivering' && trx.hasActiveComplaint) ...[
             const SizedBox(height: AppTheme.spacingMD),
             Text(
@@ -374,6 +433,49 @@ class _TransactionCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Lists every order the cancellation takes with it; wording follows the
+/// web's confirmation.
+class _CancelUnpaidDialog extends StatelessWidget {
+  final List<TransactionModel> orders;
+
+  const _CancelUnpaidDialog({required this.orders});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Batalkan pesanan dalam pembayaran ini?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final order in orders)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                child: Text(
+                  '${order.code} - ${order.storeName ?? 'Toko'}\n${CurrencyFormatter.formatRupiah(order.grandTotal)}',
+                  style: AppTheme.bodyMd,
+                ),
+              ),
+            const SizedBox(height: AppTheme.spacingSM),
+            const Text(
+              'Semua pesanan di atas dibatalkan. Saldo Blukios yang digunakan akan dikembalikan.',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Kembali')),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+          child: const Text('Batalkan Pesanan'),
+        ),
+      ],
     );
   }
 }

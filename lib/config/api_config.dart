@@ -62,6 +62,7 @@ class ApiConfig {
 
   static String transactionCheckStatus(String id) => '/transaction/$id/check-status';
   static String transactionCancel(String id) => '/transaction/$id/cancel';
+  static String transactionCancelUnpaid(String id) => '/transaction/$id/cancel-unpaid';
   static String transactionRefundAccount(String id) => '/transaction/$id/refund-account';
 
   // Buyer complaint on a delivering order. The id after /complaint is the

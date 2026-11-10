@@ -144,6 +144,31 @@ class TransactionNotifier extends Notifier<TransactionData> {
     }
   }
 
+  /// Loads every order the cancellation of [id] would take with it. Returns
+  /// the orders, or the API's error message.
+  Future<({List<TransactionModel>? orders, String? error})> previewCancelUnpaid(String id) async {
+    try {
+      final orders = await ref.read(transactionRepositoryProvider).previewCancelUnpaid(id);
+      return (orders: orders, error: null);
+    } catch (e) {
+      return (orders: null, error: _message(e));
+    }
+  }
+
+  /// Cancels the unpaid order [id] (and the rest of its payment), then
+  /// reloads the list. Returns the API's message, or its error.
+  Future<({String? message, String? error})> cancelUnpaid(String id) async {
+    try {
+      final result = await ref.read(transactionRepositoryProvider).cancelUnpaid(id);
+      await loadTransactions();
+      return (message: result.message, error: null);
+    } catch (e) {
+      return (message: null, error: _message(e));
+    }
+  }
+
+  String _message(Object e) => e is ValidationException ? e.firstError : e.toString();
+
   /// Saves where a manual refund (bank VA payment) should be transferred.
   /// Returns an error message, or null on success.
   Future<String?> submitRefundAccount(

@@ -238,4 +238,25 @@ void main() {
       expect(refund('processing', amount: 0).refundMessage, isNull);
     });
   });
+
+  group('canCancelUnpaid', () {
+    TransactionModel order(String status, {Object? buyer = const {'user': {'id': 'u1'}}}) =>
+        TransactionModel.fromJson({..._fixture(), 'payment_status': status, 'buyer': buyer});
+
+    test('reads the buyer user from buyer.user.id and keeps it through copyWith', () {
+      expect(order('unpaid').buyerUserId, 'u1');
+      expect(order('unpaid').copyWith().buyerUserId, 'u1');
+    });
+
+    test('only the buyer, and only while unpaid or pending', () {
+      expect(order('unpaid').canCancelUnpaid('u1'), isTrue);
+      expect(order('pending').canCancelUnpaid('u1'), isTrue);
+      for (final status in ['paid', 'failed', 'expired', 'cancelled']) {
+        expect(order(status).canCancelUnpaid('u1'), isFalse, reason: status);
+      }
+      expect(order('unpaid').canCancelUnpaid('u2'), isFalse);
+      expect(order('unpaid').canCancelUnpaid(null), isFalse);
+      expect(order('unpaid', buyer: null).canCancelUnpaid('u1'), isFalse);
+    });
+  });
 }
