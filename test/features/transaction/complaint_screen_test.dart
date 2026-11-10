@@ -34,7 +34,7 @@ void main() {
   setUp(() => repository = MockTransactionRepository());
 
   Future<void> pumpScreen(WidgetTester tester, String status) async {
-    when(() => repository.getTransactions()).thenAnswer((_) async => [_order(status)]);
+    when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) async => [_order(status)]);
     final container = ProviderContainer(
       overrides: [transactionRepositoryProvider.overrideWithValue(repository)],
     );

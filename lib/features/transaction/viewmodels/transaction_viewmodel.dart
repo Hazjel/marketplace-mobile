@@ -44,8 +44,10 @@ class TransactionNotifier extends Notifier<TransactionData> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
+      // Without `mode` the API scopes a dual-role user's list to their
+      // store first, so "Pesanan Saya" would show incoming orders.
       final transactions =
-          await ref.read(transactionRepositoryProvider).getTransactions();
+          await ref.read(transactionRepositoryProvider).getTransactions(mode: 'buyer');
       state = state.copyWith(transactions: transactions, isLoading: false);
       _syncRealtimeSubscriptions();
     } catch (e) {

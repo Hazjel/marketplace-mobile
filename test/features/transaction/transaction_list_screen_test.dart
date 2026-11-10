@@ -34,7 +34,7 @@ void main() {
   setUp(() => repository = MockTransactionRepository());
 
   Future<void> pumpList(WidgetTester tester, List<TransactionModel> transactions) async {
-    when(() => repository.getTransactions()).thenAnswer((_) async => transactions);
+    when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) async => transactions);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [transactionRepositoryProvider.overrideWithValue(repository)],

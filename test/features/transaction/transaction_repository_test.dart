@@ -74,4 +74,21 @@ void main() {
     verify(() => api.post('/complaint/c1/reject', data: {'response': 'Barang sudah sesuai foto'}))
         .called(1);
   });
+
+  test('getTransactions forwards mode as a query parameter, and omits it when null', () async {
+    when(() => api.get(any(), queryParameters: any(named: 'queryParameters'))).thenAnswer(
+      (_) async => Response(requestOptions: RequestOptions(), data: {'data': {'data': []}}),
+    );
+
+    await repository.getTransactions(mode: 'buyer');
+    await repository.getTransactions(mode: 'store', rowPerPage: 50);
+    await repository.getTransactions();
+
+    final queries = verify(
+      () => api.get('/transaction/all/paginated', queryParameters: captureAny(named: 'queryParameters')),
+    ).captured.cast<Map<String, dynamic>>();
+    expect(queries[0]['mode'], 'buyer');
+    expect(queries[1]['mode'], 'store');
+    expect(queries[2].containsKey('mode'), isFalse);
+  });
 }

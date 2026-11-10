@@ -16,9 +16,8 @@ class TransactionRepository {
     // TransactionRepository::scopeToMode() reads this to decide whether the
     // paginated list is scoped to the caller's buyer_id or store_id — a user
     // can be dual-role buyer+store (like Shopee), so without it the backend
-    // can't tell which context is being asked for. Pass 'store' for the
-    // seller order list; leave null for the existing buyer call sites (their
-    // behavior is unchanged).
+    // can't tell which context is being asked for. Pass 'buyer' for the
+    // buyer order list and 'store' for the seller one.
     String? mode,
   }) async {
     final response = await _apiClient.get(
