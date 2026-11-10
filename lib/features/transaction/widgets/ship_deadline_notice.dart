@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/features/transaction/models/ship_deadline.dart';
@@ -6,15 +8,46 @@ import 'package:blukios_marketplace/features/transaction/models/transaction_mode
 /// Deadline block for a paid, unshipped order; renders nothing when
 /// [resolveShipDeadline] says it does not apply. Red when under 24 h left.
 /// Wording follows fe-blue TransactionDetail.vue for [forBuyer] and seller.
-class ShipDeadlineNotice extends StatelessWidget {
+/// Re-evaluates every minute while mounted, like the web, so the remaining
+/// time and the red state do not go stale on an open screen.
+class ShipDeadlineNotice extends StatefulWidget {
   final TransactionModel order;
   final bool forBuyer;
 
-  const ShipDeadlineNotice({super.key, required this.order, this.forBuyer = false});
+  /// The clock; injectable because tests cannot fake `DateTime.now()`.
+  final DateTime Function() now;
+
+  const ShipDeadlineNotice({
+    super.key,
+    required this.order,
+    this.forBuyer = false,
+    this.now = DateTime.now,
+  });
+
+  @override
+  State<ShipDeadlineNotice> createState() => _ShipDeadlineNoticeState();
+}
+
+class _ShipDeadlineNoticeState extends State<ShipDeadlineNotice> {
+  late final Timer _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final deadline = resolveShipDeadline(order);
+    final order = widget.order;
+    final forBuyer = widget.forBuyer;
+    final deadline = resolveShipDeadline(order, now: widget.now());
     if (deadline == null) return const SizedBox.shrink();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
