@@ -81,6 +81,64 @@ void main() {
     });
   });
 
+  group('4xx messages from the refund and status guards', () {
+    SellerOrderDetailNotifier notifier() => container.read(sellerOrderDetailProvider('o1').notifier);
+    String? updateError() => container.read(sellerOrderDetailProvider('o1')).updateError;
+
+    // What ApiClient throws for the API's domain 422: `{ success, message, data }`.
+    final escrowGuard = ValidationException.fromBody(const {
+      'success': false,
+      'message': 'Dana pesanan sudah dirilis atau dikembalikan',
+      'data': null,
+    });
+    // ...and for a FormRequest 422: a generic message with the detail in `errors`.
+    final invalidReason = ValidationException.fromBody(const {
+      'success': false,
+      'message': 'Validasi gagal',
+      'errors': {
+        'reason': ['Alasan minimal 5 karakter.'],
+      },
+    });
+
+    test('cancel shows the escrow guard message', () async {
+      when(() => repository.cancelOrder(id: 'o1', reason: 'Stok habis')).thenThrow(escrowGuard);
+
+      expect(await notifier().cancel(reason: 'Stok habis'), isFalse);
+      expect(updateError(), 'Dana pesanan sudah dirilis atau dikembalikan');
+    });
+
+    test('cancel shows the first field error, not "Validasi gagal"', () async {
+      when(() => repository.cancelOrder(id: 'o1', reason: 'Stok habis')).thenThrow(invalidReason);
+
+      expect(await notifier().cancel(reason: 'Stok habis'), isFalse);
+      expect(updateError(), 'Alasan minimal 5 karakter.');
+    });
+
+    test('updateStatus shows the status guard message', () async {
+      when(() => repository.updateDeliveryStatus(
+            id: 'o1',
+            deliveryStatus: 'processing',
+            trackingNumber: any(named: 'trackingNumber'),
+            deliveryProofPath: any(named: 'deliveryProofPath'),
+          )).thenThrow(ValidationException.fromBody(const {
+        'success': false,
+        'message': 'Status pesanan tidak bisa dikembalikan atau diubah setelah selesai',
+        'data': null,
+      }));
+
+      expect(await notifier().updateStatus(deliveryStatus: 'processing'), isFalse);
+      expect(updateError(), 'Status pesanan tidak bisa dikembalikan atau diubah setelah selesai');
+    });
+
+    test('a 5xx keeps the server message', () async {
+      when(() => repository.cancelOrder(id: 'o1', reason: 'Stok habis'))
+          .thenThrow(ApiException(message: 'Terjadi kesalahan pada server.', statusCode: 500));
+
+      expect(await notifier().cancel(reason: 'Stok habis'), isFalse);
+      expect(updateError(), 'Terjadi kesalahan pada server.');
+    });
+  });
+
   group('complaints', () {
     SellerOrderDetailNotifier notifier() => container.read(sellerOrderDetailProvider('o1').notifier);
 
