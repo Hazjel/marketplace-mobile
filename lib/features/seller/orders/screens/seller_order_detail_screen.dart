@@ -212,9 +212,11 @@ class _SellerOrderDetailScreenState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(order.code, style: AppTheme.titleMd),
+                                      // Long codes wrap instead of pushing the badge off-screen.
+                                      Expanded(child: Text(order.code, style: AppTheme.titleMd)),
+                                      const SizedBox(width: AppTheme.spacingSM),
                                       _StatusBadge(
                                         status: order.deliveryStatus,
                                         label: order.deliveryStatusLabel,
