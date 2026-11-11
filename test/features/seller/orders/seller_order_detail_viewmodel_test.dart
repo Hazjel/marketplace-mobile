@@ -130,6 +130,24 @@ void main() {
       expect(updateError(), 'Status pesanan tidak bisa dikembalikan atau diubah setelah selesai');
     });
 
+    test('updateStatus shows the first field error, not "Validasi gagal"', () async {
+      when(() => repository.updateDeliveryStatus(
+            id: 'o1',
+            deliveryStatus: 'delivering',
+            trackingNumber: any(named: 'trackingNumber'),
+            deliveryProofPath: any(named: 'deliveryProofPath'),
+          )).thenThrow(ValidationException.fromBody(const {
+        'success': false,
+        'message': 'Validasi gagal',
+        'errors': {
+          'tracking_number': ['Nomor resi wajib diisi'],
+        },
+      }));
+
+      expect(await notifier().updateStatus(deliveryStatus: 'delivering'), isFalse);
+      expect(updateError(), 'Nomor resi wajib diisi');
+    });
+
     test('a 5xx keeps the server message', () async {
       when(() => repository.cancelOrder(id: 'o1', reason: 'Stok habis'))
           .thenThrow(ApiException(message: 'Terjadi kesalahan pada server.', statusCode: 500));
