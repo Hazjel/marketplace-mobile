@@ -1,0 +1,73 @@
+# Replaces the Jenkinsfile on the shared fth-jenkins host: the same checks
+# (pub get, analyze, test) on GitHub's runners for every PR and push to main,
+# plus the debug-APK compile smoke test. Nothing here signs, publishes or uses
+# a secret (the repo is public, so keep it that way); release APKs are still
+# signed on the laptop and attached to GitHub Releases by hand.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Only PR runs are cancelled: a superseded push to main keeps its result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Same Flutter as the laptop that writes pubspec.lock and builds releases.
+  FLUTTER_VERSION: '3.47.4'
+
+jobs:
+  test:
+    name: Analyze & Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # cache: true caches the SDK and ~/.pub-cache; the pub cache key ends in
+      # hashFiles('**/pubspec.lock'), so it refreshes whenever the lockfile changes.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  # Compile smoke test only (no signing, no secrets, artifact not uploaded).
+  # Not run for pull_request, so fork PRs never reach this job.
+  apk:
+    name: Build debug APK
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter build apk --debug
