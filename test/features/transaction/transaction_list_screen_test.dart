@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
@@ -54,6 +55,7 @@ TransactionModel _order(
   String buyerUserId = 'buyer-1',
   String store = 'Toko Satu',
   double total = 26000,
+  String? createdAt,
 }) {
   return TransactionModel(
     id: id,
@@ -65,6 +67,7 @@ TransactionModel _order(
     tax: 0,
     grandTotal: total,
     paymentStatus: paymentStatus,
+    createdAt: createdAt,
     transactionDetails: const [],
   );
 }
@@ -72,6 +75,7 @@ TransactionModel _order(
 void main() {
   late MockTransactionRepository repository;
 
+  setUpAll(() => initializeDateFormatting('id_ID'));
   setUp(() => repository = MockTransactionRepository());
 
   Future<void> pumpList(
@@ -90,6 +94,33 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('the order date is formatted, not the raw ISO string', (tester) async {
+    await pumpList(tester, [_order('d1', createdAt: '2026-11-10T12:00:00.000000Z')]);
+
+    expect(find.textContaining('T12:00'), findsNothing);
+    expect(find.textContaining('.000000Z'), findsNothing);
+    expect(find.byWidgetPredicate(
+        (w) => w is Text && RegExp(r'^\d{2} Nov 2026$').hasMatch(w.data ?? ''),
+      ), findsOneWidget);
+  });
+
+  const paymentLabels = {
+    'unpaid': 'Belum Bayar',
+    'pending': 'Menunggu Pembayaran',
+    'paid': 'Lunas',
+    'failed': 'Gagal',
+    'cancelled': 'Dibatalkan',
+    'expired': 'Kedaluwarsa',
+    'refund_pending': 'refund_pending', // unknown values show as-is, like the web
+  };
+  for (final MapEntry(:key, :value) in paymentLabels.entries) {
+    testWidgets('payment status "$key" shows "$value"', (tester) async {
+      await pumpList(tester, [_order('p1', paymentStatus: key)]);
+
+      expect(find.text(value), findsOneWidget);
+    });
   }
 
   testWidgets('an order cancelled after payment shows the refund, not "Gagal"', (tester) async {

@@ -1,6 +1,20 @@
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/core/utils/json.dart';
 
+/// Same wording as fe-blue `PAYMENT_LABELS`. The API only sends
+/// unpaid/paid/failed. `pending` is what [TransactionModel] assumes when
+/// `payment_status` is missing; `cancelled` and `expired` are never sent
+/// today and are kept as defensive labels. Unknown values show as-is, like
+/// the web.
+const paymentStatusLabels = <String, String>{
+  'unpaid': 'Belum Bayar',
+  'pending': 'Menunggu Pembayaran',
+  'paid': 'Lunas',
+  'failed': 'Gagal',
+  'cancelled': 'Dibatalkan',
+  'expired': 'Kedaluwarsa',
+};
+
 class TransactionModel {
   final String id;
   final String code;
@@ -232,22 +246,7 @@ class TransactionModel {
     );
   }
 
-  String get paymentStatusLabel {
-    switch (paymentStatus) {
-      case 'pending':
-        return 'Menunggu Pembayaran';
-      case 'paid':
-        return 'Dibayar';
-      case 'failed':
-        return 'Gagal';
-      case 'cancelled':
-        return 'Dibatalkan';
-      case 'expired':
-        return 'Kedaluwarsa';
-      default:
-        return paymentStatus;
-    }
-  }
+  String get paymentStatusLabel => paymentStatusLabels[paymentStatus] ?? paymentStatus;
 
   /// No further status change is expected — safe to stop listening for
   /// live updates on this order. A cancelled order whose refund is still

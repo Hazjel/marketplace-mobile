@@ -5,6 +5,7 @@ import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/home/models/product_model.dart';
 import 'package:blukios_marketplace/features/seller/dashboard/models/seller_dashboard_model.dart';
 import 'package:blukios_marketplace/features/seller/dashboard/viewmodels/seller_dashboard_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/state_views.dart';
@@ -12,10 +13,8 @@ import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 /// Indonesian labels for the API's status keys. The API combines
 /// `payment_status` and `delivery_status` counts into one map, so both
 /// sets of keys are covered here.
+// Payment keys (unpaid/paid/failed) use [paymentStatusLabels], like the order lists.
 const _statusLabels = <String, String>{
-  'unpaid': 'Belum Bayar',
-  'paid': 'Dibayar',
-  'failed': 'Gagal',
   'pending': 'Menunggu',
   'shipping': 'Dikirim',
   'delivering': 'Dalam Perjalanan',
@@ -464,7 +463,7 @@ class _StatusBreakdown extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        _statusLabels[entry.key] ?? entry.key,
+                        _statusLabels[entry.key] ?? paymentStatusLabels[entry.key] ?? entry.key,
                         style: AppTheme.bodyMd,
                       ),
                     ),

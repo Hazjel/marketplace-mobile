@@ -1,8 +1,10 @@
 class ApiConfig {
   // Production API — blukios.store, served through nginx. Overridable at
   // build/run time without touching source, e.g. to point a debug build at
-  // the testing server:
-  //   flutter run --dart-define=API_BASE_URL=http://100.77.244.19:8888/api
+  // a local backend:
+  //   flutter run --dart-define=API_BASE_URL=http://10.0.2.2/api
+  // Not a testing server: 100.77.244.19:8888 is the production nginx and is
+  // not reachable over Tailscale.
   // No flag means production — this default is deliberate, not a placeholder.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -11,7 +13,7 @@ class ApiConfig {
 
   // chat-service (FastAPI) tidak berada di bawah /api: nginx meneruskan /ai/*
   // ke service itu setelah membuang prefiksnya. Default-nya diturunkan dari
-  // [baseUrl] supaya build yang menunjuk server testing ikut pindah tanpa flag
+  // [baseUrl] supaya build yang menunjuk backend lain ikut pindah tanpa flag
   // kedua, dan tetap bisa ditimpa:
   //   flutter run --dart-define=AI_BASE_URL=http://10.0.2.2:8001
   static const String _aiBaseUrlOverride = String.fromEnvironment('AI_BASE_URL');

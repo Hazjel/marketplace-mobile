@@ -1,10 +1,13 @@
 import 'package:intl/intl.dart';
 
+/// Needs `initializeDateFormatting('id_ID')` at startup (main.dart); without
+/// it [format] returns the raw string.
 class DateFormatter {
   static String format(String? dateString, {String pattern = 'dd MMM yyyy'}) {
     if (dateString == null) return '-';
     try {
-      final date = DateTime.parse(dateString);
+      // The API sends UTC ("...Z"); show the device's local time.
+      final date = DateTime.parse(dateString).toLocal();
       return DateFormat(pattern, 'id_ID').format(date);
     } catch (e) {
       return dateString;
