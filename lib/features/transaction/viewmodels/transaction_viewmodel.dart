@@ -156,15 +156,30 @@ class TransactionNotifier extends Notifier<TransactionData> {
   }
 
   /// Cancels the unpaid order [id] (and the rest of its payment), then
-  /// reloads the list. Returns the API's message, or its error.
+  /// reloads the list. Returns the API's message, or its error. A failed
+  /// request (lost response, order already cancelled) also reloads, so the
+  /// card shows what the server really has; the POST is never retried.
   Future<({String? message, String? error})> cancelUnpaid(String id) async {
     try {
       final result = await ref.read(transactionRepositoryProvider).cancelUnpaid(id);
       await loadTransactions();
       return (message: result.message, error: null);
     } catch (e) {
+      await _reloadQuietly();
       return (message: null, error: _message(e));
     }
+  }
+
+  /// Re-reads the buyer list without the loading skeleton. If that fails the
+  /// current list stays and nothing is reported: the caller already has an
+  /// error to show.
+  Future<void> _reloadQuietly() async {
+    try {
+      final transactions =
+          await ref.read(transactionRepositoryProvider).getTransactions(mode: 'buyer');
+      state = state.copyWith(transactions: transactions);
+      _syncRealtimeSubscriptions();
+    } catch (_) {}
   }
 
   String _message(Object e) => e is ValidationException ? e.firstError : e.toString();

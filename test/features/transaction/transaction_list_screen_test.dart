@@ -394,23 +394,65 @@ void main() {
       verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
     });
 
-    testWidgets('no connection while cancelling shows the message, re-enables the action and does not retry', (tester) async {
+    Future<void> confirmCancel(WidgetTester tester) async {
+      await tester.tap(find.text('Batalkan Pesanan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('no connection while cancelling shows the message, reloads the list once, re-enables the action and does not retry', (tester) async {
       when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
       when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
       await pumpList(tester, [_order('t1')]);
       clearInteractions(repository);
 
-      await tester.tap(find.text('Batalkan Pesanan'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Batalkan Pesanan')));
-      await tester.pumpAndSettle();
+      await confirmCancel(tester);
 
       expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
       expect(find.text('TRX-t1'), findsOneWidget);
       final action = find.widgetWithText(OutlinedButton, 'Batalkan Pesanan');
       expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
       verify(() => repository.cancelUnpaid('t1')).called(1);
-      verifyNever(() => repository.getTransactions(mode: any(named: 'mode')));
+      verify(() => repository.getTransactions(mode: 'buyer')).called(1);
+    });
+
+    testWidgets('a 422 on cancel (already cancelled) shows the message and reloads the list once', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(ValidationException(
+        message: 'Pesanan sudah dibatalkan',
+        fieldErrors: {'transaction': ['Pesanan sudah dibatalkan']},
+      ));
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+      // The server already cancelled it, so the reload no longer has the order.
+      when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) async => []);
+
+      await confirmCancel(tester);
+
+      expect(find.text('Pesanan sudah dibatalkan'), findsOneWidget);
+      expect(find.text('Batalkan Pesanan'), findsNothing);
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verify(() => repository.getTransactions(mode: 'buyer')).called(1);
+    });
+
+    testWidgets('a failed reload after a failed cancel keeps the list and shows only the first error', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+      when(() => repository.getTransactions(mode: 'buyer'))
+          .thenThrow(ApiException(message: 'Server error', statusCode: 500));
+
+      await confirmCancel(tester);
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.text('Server error'), findsNothing);
+      expect(find.text('TRX-t1'), findsOneWidget);
+      final action = find.widgetWithText(OutlinedButton, 'Batalkan Pesanan');
+      expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verify(() => repository.getTransactions(mode: 'buyer')).called(1);
     });
 
     testWidgets('repeated taps on the action and on confirm send the cancellation once', (tester) async {
