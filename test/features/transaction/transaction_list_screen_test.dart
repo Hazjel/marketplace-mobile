@@ -455,6 +455,50 @@ void main() {
       verify(() => repository.getTransactions(mode: 'buyer')).called(1);
     });
 
+    testWidgets('the error shows at once while the reload after a failed cancel is still pending', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+      final reload = Completer<List<TransactionModel>>();
+      when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) => reload.future);
+
+      await confirmCancel(tester);
+
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verify(() => repository.getTransactions(mode: 'buyer')).called(1);
+
+      reload.complete([_order('t1')]);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a tap while the reload after a failed cancel is pending sends no second cancellation', (tester) async {
+      when(() => repository.previewCancelUnpaid('t1')).thenAnswer((_) async => [_order('t1')]);
+      when(() => repository.cancelUnpaid('t1')).thenThrow(offline());
+      await pumpList(tester, [_order('t1')]);
+      clearInteractions(repository);
+      final reload = Completer<List<TransactionModel>>();
+      when(() => repository.getTransactions(mode: 'buyer')).thenAnswer((_) => reload.future);
+
+      await confirmCancel(tester);
+
+      // Error already shown, yet still reloading: the action stays off and a
+      // tap on it does nothing.
+      expect(find.text('Tidak ada koneksi internet'), findsOneWidget);
+      expect(find.text('Batalkan Pesanan'), findsNothing);
+      await tester.tap(find.text('Memproses pembatalan...'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      verify(() => repository.cancelUnpaid('t1')).called(1);
+      verify(() => repository.previewCancelUnpaid('t1')).called(1); // only the first tap's
+
+      reload.complete([_order('t1')]);
+      await tester.pumpAndSettle();
+
+      final action = find.widgetWithText(OutlinedButton, 'Batalkan Pesanan');
+      expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+    });
+
     testWidgets('repeated taps on the action and on confirm send the cancellation once', (tester) async {
       final preview = Completer<List<TransactionModel>>();
       final cancel = Completer<CancelUnpaidResult>();
