@@ -16,7 +16,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Only PR runs are cancelled: a superseded push to main keeps its result.
+  # PR runs cancel the superseded running run. On main a running run is never
+  # cancelled, though GitHub may replace a still-queued run with a newer one.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
