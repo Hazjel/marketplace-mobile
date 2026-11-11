@@ -52,9 +52,6 @@ flutter pub get
 Default (tanpa flag apa pun) selalu mengarah ke production (`https://blukios.store/api`) — ini disengaja, bukan placeholder. Untuk mengarahkan build ke backend lain tanpa mengedit source, pakai `--dart-define`:
 
 ```bash
-# Server testing (Tailscale)
-flutter run --dart-define=API_BASE_URL=http://100.77.244.19:8888/api
-
 # Android Emulator ke backend lokal
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2/api
 
