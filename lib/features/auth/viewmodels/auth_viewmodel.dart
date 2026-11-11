@@ -132,7 +132,10 @@ class AuthNotifier extends Notifier<AuthData> {
       AnalyticsService.logEvent('login', parameters: {'method': 'email'});
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e is ValidationException ? e.firstError : e.message,
+      );
       return false;
     } catch (e) {
       state = state.copyWith(
