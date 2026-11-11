@@ -4,21 +4,20 @@ import 'package:blukios_marketplace/config/app_theme.dart';
 import 'package:blukios_marketplace/core/utils/currency_formatter.dart';
 import 'package:blukios_marketplace/features/dashboard/data/dashboard_repository.dart';
 import 'package:blukios_marketplace/features/dashboard/viewmodels/dashboard_viewmodel.dart';
+import 'package:blukios_marketplace/features/transaction/models/transaction_model.dart';
 import 'package:blukios_marketplace/shared/widgets/app_icon.dart';
 import 'package:blukios_marketplace/shared/widgets/app_scaffold.dart';
 import 'package:blukios_marketplace/shared/widgets/state_views.dart';
 
 /// Indonesian labels for the API's status keys.
+// Payment keys (unpaid/paid/failed) use [paymentStatusLabels], like the order lists.
 const _statusLabels = <String, String>{
-  'unpaid': 'Belum Bayar',
-  'paid': 'Dibayar',
   'pending': 'Menunggu',
   'shipping': 'Dikirim',
   'delivering': 'Dalam Perjalanan',
   'delivered': 'Diterima',
   'completed': 'Selesai',
   'cancelled': 'Dibatalkan',
-  'failed': 'Gagal',
 };
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -328,7 +327,7 @@ class _StatusBreakdown extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        _statusLabels[entry.key] ?? entry.key,
+                        _statusLabels[entry.key] ?? paymentStatusLabels[entry.key] ?? entry.key,
                         style: AppTheme.bodyMd,
                       ),
                     ),
