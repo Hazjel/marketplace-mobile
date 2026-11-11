@@ -76,6 +76,8 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
       final result = await notifier.cancelUnpaid(trx.id);
       if (!mounted) return;
       _showMessage(result.error ?? result.message!, isError: result.error != null);
+      // Keep the button off until the list reload after a failed cancel ends.
+      await result.reload;
     } finally {
       if (mounted) setState(() => _cancellingId = null);
     }
