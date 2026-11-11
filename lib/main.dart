@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:blukios_marketplace/app.dart';
 import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/monitoring/client_error_reporter.dart';
@@ -30,6 +31,9 @@ void main() {
       AnalyticsService.recordError(error, stack, fatal: true);
       return true;
     };
+
+    // DateFormatter formats with 'id_ID'; intl has no data for it until loaded.
+    await initializeDateFormatting('id_ID');
 
     // Firebase.initializeApp() throws when google-services.json /
     // GoogleService-Info.plist is missing (iOS has none yet); the app must
