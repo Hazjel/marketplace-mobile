@@ -232,12 +232,17 @@ class TransactionModel {
     );
   }
 
+  /// Same wording as fe-blue `PAYMENT_LABELS`. The API only sends
+  /// unpaid/paid/failed; the rest are kept for older rows. Unknown values
+  /// show as-is, like the web.
   String get paymentStatusLabel {
     switch (paymentStatus) {
+      case 'unpaid':
+        return 'Belum Bayar';
       case 'pending':
         return 'Menunggu Pembayaran';
       case 'paid':
-        return 'Dibayar';
+        return 'Lunas';
       case 'failed':
         return 'Gagal';
       case 'cancelled':
