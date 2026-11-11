@@ -10,6 +10,9 @@ import 'package:blukios_marketplace/core/monitoring/analytics_service.dart';
 import 'package:blukios_marketplace/core/monitoring/client_error_reporter.dart';
 import 'package:blukios_marketplace/core/monitoring/notification_service.dart';
 
+/// DateFormatter formats with 'id_ID'; intl has no data for it until loaded.
+Future<void> initLocale() => initializeDateFormatting('id_ID');
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -32,8 +35,7 @@ void main() {
       return true;
     };
 
-    // DateFormatter formats with 'id_ID'; intl has no data for it until loaded.
-    await initializeDateFormatting('id_ID');
+    await initLocale();
 
     // Firebase.initializeApp() throws when google-services.json /
     // GoogleService-Info.plist is missing (iOS has none yet); the app must
