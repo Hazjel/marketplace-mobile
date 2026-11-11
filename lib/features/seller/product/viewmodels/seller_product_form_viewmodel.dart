@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:blukios_marketplace/core/network/api_exceptions.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/category/models/category_detail_model.dart';
 import 'package:blukios_marketplace/features/category/viewmodels/category_viewmodel.dart';
@@ -140,7 +141,10 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
       return product;
     } catch (e) {
       if (_disposed) return null;
-      state = state.copyWith(isSaving: false, errorMessage: e.toString());
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: e is ValidationException ? e.firstError : e.toString(),
+      );
       return null;
     }
   }
@@ -159,7 +163,10 @@ class SellerProductFormNotifier extends AutoDisposeNotifier<SellerProductFormDat
       return product;
     } catch (e) {
       if (_disposed) return null;
-      state = state.copyWith(isSaving: false, errorMessage: e.toString());
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: e is ValidationException ? e.firstError : e.toString(),
+      );
       return null;
     }
   }

@@ -56,6 +56,7 @@ TransactionModel _order(
   String store = 'Toko Satu',
   double total = 26000,
   String? createdAt,
+  List<TransactionDetailModel> details = const [],
 }) {
   return TransactionModel(
     id: id,
@@ -68,7 +69,7 @@ TransactionModel _order(
     grandTotal: total,
     paymentStatus: paymentStatus,
     createdAt: createdAt,
-    transactionDetails: const [],
+    transactionDetails: details,
   );
 }
 
@@ -95,6 +96,33 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  TransactionDetailModel line(String name, int qty, double subtotal) => TransactionDetailModel(
+        id: 'd-$name',
+        productId: 'p-$name',
+        productName: name,
+        qty: qty,
+        subtotal: subtotal,
+      );
+
+  testWidgets('the first item shows its unit price: subtotal over quantity', (tester) async {
+    await pumpList(tester, [
+      _order('i1', details: [line('Kaos Polos', 3, 150000)]),
+    ]);
+
+    expect(find.text('Kaos Polos'), findsOneWidget);
+    expect(find.text('3 barang x Rp 50.000'), findsOneWidget);
+    expect(find.textContaining('produk lainnya'), findsNothing);
+  });
+
+  testWidgets('an order with several products counts the rest', (tester) async {
+    await pumpList(tester, [
+      _order('i2', details: [line('Kaos Polos', 1, 50000), line('Topi', 2, 40000), line('Tas', 1, 90000)]),
+    ]);
+
+    expect(find.text('1 barang x Rp 50.000'), findsOneWidget);
+    expect(find.text('+2 produk lainnya'), findsOneWidget);
+  });
 
   testWidgets('the order date is formatted, not the raw ISO string', (tester) async {
     await pumpList(tester, [_order('d1', createdAt: '2026-11-10T12:00:00.000000Z')]);

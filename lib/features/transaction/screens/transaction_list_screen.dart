@@ -301,6 +301,10 @@ class _TransactionCard extends StatelessWidget {
             DateFormatter.format(trx.createdAt),
             style: AppTheme.labelSm.copyWith(color: muted),
           ),
+          if (trx.transactionDetails.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spacingSM),
+            _FirstItem(trx: trx, muted: muted),
+          ],
           if (trx.paymentStatus == 'paid') ...[
             const SizedBox(height: AppTheme.spacingMD),
             _DeliveryStepper(status: trx.deliveryStatus),
@@ -435,6 +439,44 @@ class _TransactionCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// First item of the order, like the web card: name, "N barang x unit price"
+/// and how many more products the order holds. The API sends no unit price,
+/// so it is the line subtotal over its quantity.
+class _FirstItem extends StatelessWidget {
+  final TransactionModel trx;
+  final Color muted;
+
+  const _FirstItem({required this.trx, required this.muted});
+
+  @override
+  Widget build(BuildContext context) {
+    final item = trx.transactionDetails.first;
+    final more = trx.transactionDetails.length - 1;
+    final unitPrice = item.qty > 0 ? item.subtotal / item.qty : item.subtotal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.productName ?? 'Produk',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTheme.titleSm,
+        ),
+        Text(
+          '${item.qty} barang x ${CurrencyFormatter.formatRupiah(unitPrice)}',
+          style: AppTheme.bodySm.copyWith(color: muted),
+        ),
+        if (more > 0)
+          Text(
+            '+$more produk lainnya',
+            style: AppTheme.labelSm.copyWith(color: muted),
+          ),
+      ],
     );
   }
 }

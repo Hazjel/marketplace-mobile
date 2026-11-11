@@ -90,7 +90,10 @@ class SellerOrderDetailNotifier
       return true;
     } catch (e) {
       if (_disposed) return false;
-      state = state.copyWith(isUpdating: false, updateError: e.toString());
+      state = state.copyWith(
+        isUpdating: false,
+        updateError: e is ValidationException ? e.firstError : e.toString(),
+      );
       return false;
     }
   }
@@ -109,7 +112,10 @@ class SellerOrderDetailNotifier
       return true;
     } catch (e) {
       if (_disposed) return false;
-      state = state.copyWith(isUpdating: false, updateError: e.toString());
+      state = state.copyWith(
+        isUpdating: false,
+        updateError: e is ValidationException ? e.firstError : e.toString(),
+      );
       return false;
     }
   }
