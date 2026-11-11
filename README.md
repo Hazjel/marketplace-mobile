@@ -2,7 +2,7 @@
 
 Aplikasi mobile marketplace berbasis Flutter yang terintegrasi dengan Laravel 12 API (api-blue).
 
-CI/CD: Jenkins (`Jenkinsfile` di root repo ini), server sama dengan yang dipakai repo web; job-nya didaftarkan sekali, lihat [CI/CD](#cicd).
+CI/CD: GitHub Actions (`.github/workflows/ci.yml`), lihat [CI/CD](#cicd).
 
 ## Arsitektur
 
@@ -118,34 +118,21 @@ Untuk mengaktifkan:
 
 ## CI/CD
 
-Jenkins (server yang sama dengan repo web) menjalankan `flutter pub get`,
-`flutter analyze`, dan `flutter test` di setiap push ke `main` (polling 5 menit). Build APK
-debug tidak ikut otomatis karena berat di disk server yang dipakai bersama pipeline tim lain:
-centang `BUILD_DEBUG_APK` di "Build with Parameters" kalau perlu (mis. setelah upgrade
-Gradle/AGP). APK rilis tetap dibuat dan di-sign dari laptop, lihat [Rilis Android](#rilis-android).
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) berjalan di runner
+GitHub (`ubuntu-24.04`) dan menjadi status check di setiap pull request serta setiap push ke `main`:
 
-**Mendaftarkan job (sekali).** Jenkins memakai "Full Control Once Logged In": akun Jenkins
-mana pun bisa membuat job, tidak perlu admin. Pilih salah satu:
+- **Analyze & Test**: `flutter pub get`, `flutter analyze`, `flutter test`.
+- **Build debug APK**: `flutter build apk --debug`, hanya untuk push ke `main` dan run manual
+  (Actions, CI, Run workflow). Tidak jalan di pull request. Ini compile smoke test: tanpa
+  signing, tanpa secret, APK tidak diunggah.
 
-- **UI:** New Item, nama `blukios-mobile-pipeline`, tipe Pipeline. Di bagian Pipeline pilih
-  "Pipeline script from SCM", SCM Git, URL `https://github.com/Hazjel/marketplace-mobile.git`,
-  branch `*/main`, Script Path `Jenkinsfile`. Tanpa credential, repo ini publik. Simpan, lalu
-  Build Now sekali: parameter `BUILD_DEBUG_APK` dan polling baru terdaftar setelah build pertama.
-- **File config** ([ci/jenkins-job.xml](ci/jenkins-job.xml)), dijalankan di host Jenkins, lalu
-  Manage Jenkins, Reload Configuration from Disk. Jangan me-restart container Jenkins:
-  pipeline project lain hidup di server yang sama.
+Flutter di-pin ke 3.47.4 (sama dengan laptop yang membuat `pubspec.lock` dan APK rilis); naikkan
+lewat `FLUTTER_VERSION` di workflow. Setiap action di-pin ke commit SHA penuh dan token workflow
+hanya `contents: read`. APK rilis tetap dibuat dan di-sign dari laptop, lihat
+[Rilis Android](#rilis-android).
 
-  ```bash
-  docker exec fth-jenkins mkdir -p /var/jenkins_home/jobs/blukios-mobile-pipeline
-  docker cp ci/jenkins-job.xml fth-jenkins:/var/jenkins_home/jobs/blukios-mobile-pipeline/config.xml
-  ```
-
-**Image dan cache.** `ghcr.io/cirruslabs/flutter:3.44.0`, di-pin (Cirrus belum menerbitkan
-tag 3.47; `pubspec.lock` butuh Flutter >= 3.38.4). Build pertama mengunduh image itu (2,3 GB
-terkompresi, sekitar 7 GB di disk) dan bisa lama. Cache pub dan Gradle ada di volume
-`blukios-mobile-ci-cache`, NDK untuk build APK di `blukios-mobile-ci-ndk`. Container jalan
-sebagai root karena SDK di image milik root; skrip mengembalikan kepemilikan workspace ke
-Jenkins setiap selesai.
+Pipeline Jenkins lama (`Jenkinsfile`, job `blukios-mobile-pipeline`) sudah dipensiunkan dan
+filenya dihapus dari repo ini.
 
 ## Rilis Android
 
