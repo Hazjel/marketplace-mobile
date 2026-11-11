@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:blukios_marketplace/core/providers.dart';
 import 'package:blukios_marketplace/features/seller/orders/screens/seller_order_detail_screen.dart';
@@ -48,6 +49,7 @@ const _resiHint = 'Isi nomor resi dulu untuk menandai pesanan dikirim.';
 void main() {
   late MockTransactionRepository repository;
 
+  setUpAll(() => initializeDateFormatting('id_ID'));
   setUp(() => repository = MockTransactionRepository());
 
   Future<void> pumpDetail(WidgetTester tester, TransactionModel order) async {
@@ -63,6 +65,36 @@ void main() {
       child: MaterialApp.router(routerConfig: router),
     ));
     await tester.pumpAndSettle();
+  }
+
+  for (final width in [360.0, 411.0]) {
+    testWidgets('a 29-character order code wraps beside its badge at ${width.toInt()} dp', (tester) async {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      const code = 'BLK11112026061151304945938400X';
+      await pumpDetail(
+        tester,
+        TransactionModel(
+          id: 'o1',
+          code: code,
+          shippingCost: 5000,
+          deliveryStatus: 'processing',
+          tax: 0,
+          grandTotal: 26000,
+          paymentStatus: 'paid',
+          createdAt: '2026-11-10T12:00:00.000000Z',
+          transactionDetails: const [],
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(code), findsOneWidget);
+      expect(find.text('Diproses'), findsOneWidget);
+      expect(find.textContaining('T12:00'), findsNothing);
+      expect(find.textContaining(RegExp(r'^\d{2} Nov 2026$')), findsOneWidget);
+    });
   }
 
   testWidgets('an open complaint shows details, deadline and both actions', (tester) async {
