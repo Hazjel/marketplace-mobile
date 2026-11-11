@@ -45,7 +45,11 @@ jobs:
       - run: flutter --version
       - run: flutter pub get
       - run: flutter analyze
+      # The runner is UTC; a fixed zone lets the date tests catch a missing
+      # .toLocal(). Jakarta is the app's market (UTC+7, no DST).
       - run: flutter test
+        env:
+          TZ: Asia/Jakarta
 
   # Compile smoke test only (no signing, no secrets, artifact not uploaded).
   # Not run for pull_request, so fork PRs never reach this job.
