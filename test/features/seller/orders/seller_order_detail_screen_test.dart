@@ -68,7 +68,7 @@ void main() {
   }
 
   for (final width in [360.0, 411.0]) {
-    testWidgets('a 29-character order code wraps beside its badge at ${width.toInt()} dp', (tester) async {
+    testWidgets('a 30-character order code wraps beside its badge at ${width.toInt()} dp', (tester) async {
       tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
